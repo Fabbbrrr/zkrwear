@@ -1,0 +1,111 @@
+{
+  "hmac": [
+    {
+      "name": "post_json_no_query",
+      "method": "POST",
+      "url": "https://gateway-pub-hw-em-sg.zeekrlife.com/overseas-app/ms-vehicle-status/api/v1.0/vehicle/status/latest",
+      "body": "{\"vin\":\"TESTVIN1234567890\"}",
+      "access_key": "TESTACCESSKEY0000000000000000000",
+      "secret_key": "TESTSECRETKEY0000000000000000000",
+      "gmt_date": "Mon, 10 Aug 2026 06:30:00 GMT",
+      "expect": {
+        "X-HMAC-ALGORITHM": "hmac-sha256",
+        "X-HMAC-SIGNATURE": "RiR67AFQhi3fTkcECbFSfgK00Bc7WvCRA4RGf+Um4lE=",
+        "X-HMAC-ACCESS-KEY": "TESTACCESSKEY0000000000000000000",
+        "X-HMAC-DIGEST": "bB9aLShECQdN4oVSwC2pxTI5d0yL2DC8eGZFvDcxIfY=",
+        "X-DATE": "Mon, 10 Aug 2026 06:30:00 GMT"
+      }
+    },
+    {
+      "name": "get_no_body_no_query",
+      "method": "GET",
+      "url": "https://gateway-pub-hw-em-sg.zeekrlife.com/overseas-app/ms-app-bff/api/v4.0/veh/vehicle-list",
+      "body": "",
+      "access_key": "TESTACCESSKEY0000000000000000000",
+      "secret_key": "TESTSECRETKEY0000000000000000000",
+      "gmt_date": "Mon, 10 Aug 2026 06:30:00 GMT",
+      "expect": {
+        "X-HMAC-ALGORITHM": "hmac-sha256",
+        "X-HMAC-SIGNATURE": "S3Vof8m88o2MgtAaHQKYcOq40Y2NySYxigaDSZHIGEM=",
+        "X-HMAC-ACCESS-KEY": "TESTACCESSKEY0000000000000000000",
+        "X-HMAC-DIGEST": "RZR+f9aq8hOf6F4tzV9RYTGYI49SucXk9AGi1Ul257k=",
+        "X-DATE": "Mon, 10 Aug 2026 06:30:00 GMT"
+      }
+    },
+    {
+      "name": "get_with_query",
+      "method": "GET",
+      "url": "https://gateway-pub-hw-em-sg.zeekrlife.com/overseas-app/ms-vehicle-trail/v1.0/journalLog/trip/listForPage?pageSize=50&Page=1",
+      "body": "",
+      "access_key": "TESTACCESSKEY0000000000000000000",
+      "secret_key": "TESTSECRETKEY0000000000000000000",
+      "gmt_date": "Mon, 10 Aug 2026 06:30:00 GMT",
+      "expect": {
+        "X-HMAC-ALGORITHM": "hmac-sha256",
+        "X-HMAC-SIGNATURE": "B61gPwnl6fVoV3XmgjVDfetzXzGboiHDgR1/FSSqhtc=",
+        "X-HMAC-ACCESS-KEY": "TESTACCESSKEY0000000000000000000",
+        "X-HMAC-DIGEST": "RZR+f9aq8hOf6F4tzV9RYTGYI49SucXk9AGi1Ul257k=",
+        "X-DATE": "Mon, 10 Aug 2026 06:30:00 GMT"
+      }
+    },
+    {
+      "name": "post_empty_body",
+      "method": "POST",
+      "url": "https://gateway-pub-hw-em-sg.zeekrlife.com/overseas-app/x/y",
+      "body": "",
+      "access_key": "TESTACCESSKEY0000000000000000000",
+      "secret_key": "TESTSECRETKEY0000000000000000000",
+      "gmt_date": "Mon, 10 Aug 2026 06:30:00 GMT",
+      "expect": {
+        "X-HMAC-ALGORITHM": "hmac-sha256",
+        "X-HMAC-SIGNATURE": "kVyjk6yNG3y7rnCdKZBiAhzDF3mdTz02bP3co71qCkw=",
+        "X-HMAC-ACCESS-KEY": "TESTACCESSKEY0000000000000000000",
+        "X-HMAC-DIGEST": "RZR+f9aq8hOf6F4tzV9RYTGYI49SucXk9AGi1Ul257k=",
+        "X-DATE": "Mon, 10 Aug 2026 06:30:00 GMT"
+      }
+    }
+  ],
+  "appsig": [
+    {
+      "name": "auth_post_json",
+      "method": "POST",
+      "url": "https://sea-snc-tsp-api-gw.zeekrlife.com/auth/loginByEmailEncrypt",
+      "headers": {
+        "Content-Type": "application/json",
+        "x-app-id": "app",
+        "x-project-id": "ZEEKR_SEA",
+        "authorization": "Bearer TESTBEARER",
+        "x-timestamp": "1754807400000",
+        "x-api-signature-nonce": "11111111-2222-3333-4444-555555555555",
+        "x-api-signature-version": "1.0",
+        "accept-language": "en",
+        "x-vin": "ENCRYPTEDVINBASE64==",
+        "x-device-id": "device-123",
+        "x-platform": "app"
+      },
+      "body": "{\"email\":\"a@b.com\",\"password\":\"cipher\",\"zzz\":1,\"aaa\":2}",
+      "secret": "TESTPRODSECRET000000000000000000",
+      "expect": {
+        "X-SIGNATURE": "ta75yi3M7F4nWRgUNuHvthOMID9eeiX5rZ0xTYWobJA="
+      }
+    },
+    {
+      "name": "auth_get_with_query",
+      "method": "GET",
+      "url": "https://sea-snc-tsp-api-gw.zeekrlife.com/user/tspCode?b=2&A=1",
+      "headers": {
+        "Content-Type": "application/json",
+        "x-app-id": "app",
+        "x-project-id": "ZEEKR_SEA",
+        "authorization": "Bearer TESTBEARER",
+        "x-timestamp": "1754807400000",
+        "x-api-signature-nonce": "11111111-2222-3333-4444-555555555555"
+      },
+      "body": "",
+      "secret": "TESTPRODSECRET000000000000000000",
+      "expect": {
+        "X-SIGNATURE": "OWuroKJOjCWMuZEI69QC2eGox08Eq2YGgDuxn69mpc8="
+      }
+    }
+  ]
+}

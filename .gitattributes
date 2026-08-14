@@ -1,0 +1,11 @@
+# Normalize line endings. Shell scripts MUST stay LF or they break on macOS/Linux.
+* text=auto eol=lf
+*.bat text eol=crlf
+gradlew text eol=lf
+
+# Binaries
+*.png binary
+*.jar binary
+*.apk binary
+*.keystore binary
+*.jks binary

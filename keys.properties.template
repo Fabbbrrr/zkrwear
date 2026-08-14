@@ -1,0 +1,23 @@
+# App secrets — copy this file to `keys.properties` (which is gitignored)
+# and fill in the values you extracted for your Home Assistant build via
+# https://github.com/Wysie/zeekr_key_extractor
+#
+# These are REGION-scoped (app-global), not per-account: the dedicated watch
+# account reuses the exact same values. Only the login email/password differ.
+#
+# keys.properties is read at build time and baked into BuildConfig (see
+# app/build.gradle.kts). It is never committed.
+
+HMAC_ACCESS_KEY=
+HMAC_SECRET_KEY=
+PASSWORD_PUBLIC_KEY=
+PROD_SECRET=
+VIN_KEY=
+VIN_IV=
+COUNTRY_CODE=AU
+
+# Optional: bake in the DEDICATED watch account's login for a personal sideload.
+# Leave blank to have the app show a "not configured" screen instead.
+# (M5 will add on-watch secure entry so credentials need not live here.)
+ACCOUNT_EMAIL=
+ACCOUNT_PASSWORD=

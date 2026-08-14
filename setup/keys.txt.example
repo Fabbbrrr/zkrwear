@@ -1,0 +1,23 @@
+# Copy this file to "keys.txt" (same folder) and paste in YOUR values.
+# These are the SAME keys the Home Assistant zeekr_ev integration uses.
+# Extract them with: https://github.com/Wysie/zeekr_key_extractor
+#
+# keys.txt stays on your PC — it is never uploaded and never baked into the app.
+# The setup script imports it into the watch app's encrypted (Keystore) storage.
+
+# --- Region-scoped app keys (same for everyone in your region) ---
+HMAC_ACCESS_KEY=
+HMAC_SECRET_KEY=
+PASSWORD_PUBLIC_KEY=
+PROD_SECRET=
+VIN_KEY=
+VIN_IV=
+
+# --- Your account ---
+# Use a DEDICATED account with the car shared to it — logging in boots any
+# other active session (your phone app / Home Assistant).
+ACCOUNT_EMAIL=
+ACCOUNT_PASSWORD=
+
+# AU -> SEA region. Change only if you are in another region.
+COUNTRY_CODE=AU

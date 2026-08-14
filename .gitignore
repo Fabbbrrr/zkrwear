@@ -1,0 +1,32 @@
+# Secrets — never commit
+keys.properties
+local.properties
+setup/keys.txt
+
+# Setup script downloads (portable adb) — never commit
+setup/platform-tools/
+setup/platform-tools.zip
+setup/app-release.apk
+
+# Built APKs — upload to GitHub Releases instead of committing
+release/
+*.apk
+
+# Gradle / build
+.gradle/
+build/
+captures/
+out/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.DS_Store
+
+# Keystores
+*.jks
+*.keystore
+
+# Python tooling scratch
+tools/__pycache__/
+tools/*.pyc
