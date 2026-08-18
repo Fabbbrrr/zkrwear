@@ -444,15 +444,13 @@ private fun SlotButton(
             }
         // Active state is signaled by the orange (primary) button fill; the icon stays
         // white so it's always legible (an orange tint on the orange fill would vanish).
-        ActionSlot.CLIMATE -> {
-            val on = status.climateActive == true
-            IconAction(
-                iconRes = R.drawable.ic_climate,
-                label = "Climate",
-                colors = if (on) ButtonDefaults.primaryButtonColors() else ButtonDefaults.secondaryButtonColors(),
+        // Shows the cabin temperature under the icon when known, for climate context.
+        ActionSlot.CLIMATE ->
+            ClimateButton(
+                on = status.climateActive == true,
+                interiorTempC = status.interiorTempC,
                 pending = pending(CommandKind.CLIMATE),
             ) { onAction(CommandKind.CLIMATE) }
-        }
         ActionSlot.SENTRY -> {
             val on = status.sentryActive == true
             IconAction(
@@ -465,6 +463,55 @@ private fun SlotButton(
         // Momentary locate: flashes the blinkers. Fires immediately (harmless).
         ActionSlot.FLASH ->
             IconAction(R.drawable.ic_flash, "Flash") { onAction(CommandKind.FLASH) }
+    }
+}
+
+/**
+ * Climate button — like [IconAction] but stacks the cabin temperature under the
+ * icon when it's known (e.g. "22°"), giving climate control real context at a glance.
+ * Shows the same in-flight progress ring as [IconAction] while [pending].
+ */
+@Composable
+private fun ClimateButton(
+    on: Boolean,
+    interiorTempC: Double?,
+    pending: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Box(contentAlignment = Alignment.Center) {
+        Button(
+            onClick = { if (!pending) onClick() },
+            colors = if (on) ButtonDefaults.primaryButtonColors() else ButtonDefaults.secondaryButtonColors(),
+            modifier = Modifier.size(56.dp),
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_climate),
+                    contentDescription = "Climate",
+                    tint = MaterialTheme.colors.onSurface,
+                    modifier = Modifier.size(if (interiorTempC != null) 24.dp else 30.dp),
+                )
+                if (interiorTempC != null) {
+                    Text(
+                        text = "${interiorTempC.roundToInt()}°",
+                        style = MaterialTheme.typography.caption2,
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colors.onSurface,
+                    )
+                }
+            }
+        }
+        if (pending) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(56.dp),
+                strokeWidth = 3.dp,
+                indicatorColor = ZkrOrange,
+                trackColor = androidx.compose.ui.graphics.Color.Transparent,
+            )
+        }
     }
 }
 
