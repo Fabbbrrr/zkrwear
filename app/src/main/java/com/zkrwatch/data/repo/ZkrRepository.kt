@@ -116,6 +116,15 @@ class ZkrRepository(
         return remoteControl(vin, command = "start", serviceId = "ZAF", setting)
     }
 
+    /** Flashes the blinkers to locate the car (serviceId RHL). Momentary; no state. */
+    suspend fun flashLights(vin: String): Boolean =
+        remoteControl(
+            vin,
+            command = "start",
+            serviceId = "RHL",
+            setting = linkedMapOf("serviceParameters" to listOf(param("rhl", "light-flash"))),
+        )
+
     /** Arms/disarms sentry (surveillance) mode. serviceId RSM; only the verb differs. */
     suspend fun setSentry(vin: String, on: Boolean): Boolean =
         remoteControl(
