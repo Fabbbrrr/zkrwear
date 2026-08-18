@@ -351,8 +351,9 @@ private fun BatteryBar(soc: Int?, charging: Boolean = false) {
 /**
  * The user's enabled icon actions, in [ActionSlot] order. Unlock and Trunk require
  * a slide-to-confirm (which replaces the cluster while active); Lock, Climate and
- * Sentry fire immediately. Up to three slots sit on one row; four wrap to a
- * balanced 2 + 2 so nothing overflows a small round screen.
+ * Sentry fire immediately (Sentry shows On/Off and toggles). Up to three slots
+ * sit on one row; four wrap to a balanced 2 + 2 so nothing overflows a small
+ * round screen.
  */
 @Composable
 private fun ActionCluster(
@@ -427,7 +428,7 @@ private fun ActionCluster(
             }
         }
 
-        statusLine(commands)?.let {
+        statusLine(commands, status)?.let {
             Spacer(Modifier.height(4.dp))
             Text(it, style = MaterialTheme.typography.caption2, color = ZkrGrey, maxLines = 1)
         }
@@ -473,15 +474,11 @@ private fun SlotButton(
                 interiorTempC = status.interiorTempC,
                 pending = pending(CommandKind.CLIMATE),
             ) { onAction(CommandKind.CLIMATE) }
-        ActionSlot.SENTRY -> {
-            val on = status.sentryActive == true
-            IconAction(
-                iconRes = R.drawable.ic_sentry,
-                label = "Sentry",
-                colors = if (on) ButtonDefaults.primaryButtonColors() else ButtonDefaults.secondaryButtonColors(),
+        ActionSlot.SENTRY ->
+            SentryButton(
+                on = status.sentryActive,
                 pending = pending(CommandKind.SENTRY),
             ) { onAction(CommandKind.SENTRY) }
-        }
         // Momentary locate: flashes the blinkers. Fires immediately (harmless).
         ActionSlot.FLASH ->
             IconAction(R.drawable.ic_flash, "Flash") { onAction(CommandKind.FLASH) }
@@ -547,6 +544,58 @@ private fun ClimateButton(
 }
 
 /**
+ * Sentry toggle — like [ClimateButton], but stacks On/Off under the shield so the
+ * live surveillance state is readable at a glance. Orange fill means armed; tap
+ * flips the car (unknown/`null` is treated as off, so the first tap arms it).
+ */
+@Composable
+private fun SentryButton(
+    on: Boolean?,
+    pending: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val armed = on == true
+    val stateLabel = when (on) {
+        true -> "On"
+        false -> "Off"
+        null -> "—"
+    }
+    Box(contentAlignment = Alignment.Center) {
+        Button(
+            onClick = { if (!pending) onClick() },
+            colors = if (armed) ButtonDefaults.primaryButtonColors() else ButtonDefaults.secondaryButtonColors(),
+            modifier = Modifier.size(56.dp),
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_sentry),
+                    contentDescription = "Sentry $stateLabel",
+                    tint = MaterialTheme.colors.onSurface,
+                    modifier = Modifier.size(24.dp),
+                )
+                Text(
+                    text = stateLabel,
+                    style = MaterialTheme.typography.caption2,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colors.onSurface,
+                )
+            }
+        }
+        if (pending) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(56.dp),
+                strokeWidth = 3.dp,
+                indicatorColor = ZkrOrange,
+                trackColor = androidx.compose.ui.graphics.Color.Transparent,
+            )
+        }
+    }
+}
+
+/**
  * A big circular icon button (label used as accessibility description). While the
  * command is in flight, an indeterminate ring is drawn around it and taps are
  * ignored — a glanceable in-place progress cue that also blocks double-sends.
@@ -585,7 +634,10 @@ private fun IconAction(
 }
 
 /** Most-recent command status as a short line, or null when all idle. */
-private fun statusLine(commands: Map<CommandKind, CommandState>): String? {
+private fun statusLine(
+    commands: Map<CommandKind, CommandState>,
+    status: com.zkrwatch.data.model.VehicleStatus,
+): String? {
     val entry = commands.entries.firstOrNull { it.value !is CommandState.Idle } ?: return null
     return when (val st = entry.value) {
         CommandState.Pending -> when (entry.key) {
@@ -593,7 +645,7 @@ private fun statusLine(commands: Map<CommandKind, CommandState>): String? {
             CommandKind.UNLOCK -> "Unlocking…"
             CommandKind.TRUNK -> "Opening trunk…"
             CommandKind.CLIMATE -> "Climate…"
-            CommandKind.SENTRY -> "Sentry…"
+            CommandKind.SENTRY -> if (status.sentryActive == true) "Disarming…" else "Arming…"
             CommandKind.FLASH -> "Flashing…"
             CommandKind.CHARGING -> "Charge…"
         }
