@@ -453,6 +453,9 @@ private fun SlotButton(
                 pending = pending(CommandKind.SENTRY),
             ) { onAction(CommandKind.SENTRY) }
         }
+        // Momentary locate: flashes the blinkers. Fires immediately (harmless).
+        ActionSlot.FLASH ->
+            IconAction(R.drawable.ic_flash, "Flash") { onAction(CommandKind.FLASH) }
     }
 }
 
@@ -504,6 +507,7 @@ private fun statusLine(commands: Map<CommandKind, CommandState>): String? {
             CommandKind.TRUNK -> "Opening trunk…"
             CommandKind.CLIMATE -> "Climate…"
             CommandKind.SENTRY -> "Sentry…"
+            CommandKind.FLASH -> "Flashing…"
         }
         CommandState.Success -> "Done ✓"
         is CommandState.Failed -> st.message

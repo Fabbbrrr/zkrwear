@@ -106,4 +106,5 @@ private fun slotLabel(slot: ActionSlot): String = when (slot) {
     ActionSlot.TRUNK -> "Trunk"
     ActionSlot.CLIMATE -> "Climate"
     ActionSlot.SENTRY -> "Sentry"
+    ActionSlot.FLASH -> "Flash lights"
 }

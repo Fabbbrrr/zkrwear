@@ -18,10 +18,13 @@ class UiPrefsStore(context: Context) {
         .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun enabledSlots(): Set<ActionSlot> {
-        val stored = prefs.getStringSet(KEY_ENABLED, null) ?: return ActionSlot.entries.toSet()
+        val stored = prefs.getStringSet(KEY_ENABLED, null) ?: return defaultEnabled()
         val slots = stored.mapNotNull { name -> runCatching { ActionSlot.valueOf(name) }.getOrNull() }
         return slots.toSet()
     }
+
+    /** Slots shown on a fresh install (opt-in extras start hidden). */
+    fun defaultEnabled(): Set<ActionSlot> = ActionSlot.entries.filter { it.defaultVisible }.toSet()
 
     fun setEnabled(slots: Set<ActionSlot>) {
         prefs.edit()

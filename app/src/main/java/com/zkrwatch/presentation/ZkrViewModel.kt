@@ -37,7 +37,7 @@ class ZkrViewModel(
 
     /** Which action buttons the user has chosen to show. All enabled by default. */
     private val _enabledSlots = MutableStateFlow(
-        uiPrefs?.enabledSlots() ?: ActionSlot.entries.toSet(),
+        uiPrefs?.enabledSlots() ?: ActionSlot.entries.filter { it.defaultVisible }.toSet(),
     )
     val enabledSlots: StateFlow<Set<ActionSlot>> = _enabledSlots.asStateFlow()
 
@@ -96,6 +96,7 @@ class ZkrViewModel(
                         val active = (uiState.value as? VehicleUiState.Ready)?.status?.sentryActive ?: false
                         repo.setSentry(v, on = !active)
                     }
+                    CommandKind.FLASH -> repo.flashLights(v)
                 }
                 setCommand(kind, if (ok) CommandState.Success else CommandState.Failed("Car declined"))
                 if (ok && kind == CommandKind.SENTRY) {
@@ -107,8 +108,9 @@ class ZkrViewModel(
                         statusCache?.write(v, flipped)
                         _uiState.value = VehicleUiState.Ready(v, flipped)
                     }
-                } else {
-                    // Reflect the car's new state.
+                } else if (kind != CommandKind.FLASH) {
+                    // Flash is momentary and changes no state; everything else refetches
+                    // to reflect the car's new state.
                     repo.statusWithExtras(v).let {
                         statusCache?.write(v, it)
                         _uiState.value = VehicleUiState.Ready(v, it)
