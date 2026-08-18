@@ -10,6 +10,10 @@ val ZkrOrange = Color(0xFFEE6A2D)
 val ZkrGreen = Color(0xFF4FD46A)
 val ZkrGrey = Color(0xFF9AA0A6)
 
+/** Low-battery warning colors for the SOC bar. */
+val ZkrAmber = Color(0xFFF2B33D)
+val ZkrRed = Color(0xFFE5534B)
+
 private val ZkrColors = Colors(
     primary = ZkrOrange,
     primaryVariant = Color(0xFFC9541F),
