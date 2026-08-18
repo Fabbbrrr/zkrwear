@@ -346,6 +346,7 @@ private fun ActionCluster(
                             SlotButton(
                                 slot = slot,
                                 status = status,
+                                commands = commands,
                                 onAction = onAction,
                                 onConfirm = { confirm = it },
                             )
@@ -367,21 +368,31 @@ private fun ActionCluster(
 private fun SlotButton(
     slot: ActionSlot,
     status: com.zkrwatch.data.model.VehicleStatus,
+    commands: Map<CommandKind, CommandState>,
     onAction: (CommandKind) -> Unit,
     onConfirm: (CommandKind) -> Unit,
 ) {
+    fun pending(vararg kinds: CommandKind) = kinds.any { commands[it] is CommandState.Pending }
     when (slot) {
         // The icon shows current lock STATUS: an orange open padlock warns the car is
         // unlocked (tap to lock); a white closed padlock means locked (tap to unlock,
         // via slide-to-confirm).
         ActionSlot.LOCK ->
             if (status.locked == false) {
-                IconAction(R.drawable.ic_lock_open, "Lock", ZkrOrange) { onAction(CommandKind.LOCK) }
+                IconAction(
+                    R.drawable.ic_lock_open, "Lock", ZkrOrange,
+                    pending = pending(CommandKind.LOCK, CommandKind.UNLOCK),
+                ) { onAction(CommandKind.LOCK) }
             } else {
-                IconAction(R.drawable.ic_lock, "Unlock") { onConfirm(CommandKind.UNLOCK) }
+                IconAction(
+                    R.drawable.ic_lock, "Unlock",
+                    pending = pending(CommandKind.LOCK, CommandKind.UNLOCK),
+                ) { onConfirm(CommandKind.UNLOCK) }
             }
         ActionSlot.TRUNK ->
-            IconAction(R.drawable.ic_trunk, "Trunk") { onConfirm(CommandKind.TRUNK) }
+            IconAction(R.drawable.ic_trunk, "Trunk", pending = pending(CommandKind.TRUNK)) {
+                onConfirm(CommandKind.TRUNK)
+            }
         // Active state is signaled by the orange (primary) button fill; the icon stays
         // white so it's always legible (an orange tint on the orange fill would vanish).
         ActionSlot.CLIMATE -> {
@@ -390,6 +401,7 @@ private fun SlotButton(
                 iconRes = R.drawable.ic_climate,
                 label = "Climate",
                 colors = if (on) ButtonDefaults.primaryButtonColors() else ButtonDefaults.secondaryButtonColors(),
+                pending = pending(CommandKind.CLIMATE),
             ) { onAction(CommandKind.CLIMATE) }
         }
         ActionSlot.SENTRY -> {
@@ -398,31 +410,47 @@ private fun SlotButton(
                 iconRes = R.drawable.ic_sentry,
                 label = "Sentry",
                 colors = if (on) ButtonDefaults.primaryButtonColors() else ButtonDefaults.secondaryButtonColors(),
+                pending = pending(CommandKind.SENTRY),
             ) { onAction(CommandKind.SENTRY) }
         }
     }
 }
 
-/** A big circular icon button (label used as accessibility description). */
+/**
+ * A big circular icon button (label used as accessibility description). While the
+ * command is in flight, an indeterminate ring is drawn around it and taps are
+ * ignored — a glanceable in-place progress cue that also blocks double-sends.
+ */
 @Composable
 private fun IconAction(
     iconRes: Int,
     label: String,
     tint: androidx.compose.ui.graphics.Color = MaterialTheme.colors.onSurface,
     colors: ButtonColors = ButtonDefaults.secondaryButtonColors(),
+    pending: Boolean = false,
     onClick: () -> Unit,
 ) {
-    Button(
-        onClick = onClick,
-        colors = colors,
-        modifier = Modifier.size(56.dp),
-    ) {
-        Icon(
-            painter = painterResource(iconRes),
-            contentDescription = label,
-            tint = tint,
-            modifier = Modifier.size(30.dp),
-        )
+    Box(contentAlignment = Alignment.Center) {
+        Button(
+            onClick = { if (!pending) onClick() },
+            colors = colors,
+            modifier = Modifier.size(56.dp),
+        ) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = label,
+                tint = tint,
+                modifier = Modifier.size(30.dp),
+            )
+        }
+        if (pending) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(56.dp),
+                strokeWidth = 3.dp,
+                indicatorColor = ZkrOrange,
+                trackColor = androidx.compose.ui.graphics.Color.Transparent,
+            )
+        }
     }
 }
 
