@@ -160,6 +160,7 @@ private fun ReadyContent(
                 chargePowerKw = s.chargePowerKw,
                 updatedAt = state.updatedAt,
                 onRefresh = onRefresh,
+                timeToFullMinutes = s.timeToFullMinutes,
             )
         }
         item {
@@ -190,6 +191,7 @@ private fun SocHero(
     chargePowerKw: Double?,
     updatedAt: Long,
     onRefresh: () -> Unit,
+    timeToFullMinutes: Int?,
 ) {
     val haptics = LocalHapticFeedback.current
     Column(
@@ -233,7 +235,7 @@ private fun SocHero(
                 text = buildString {
                     append("Charging")
                     chargePowerKw?.let { append(" · ${formatKw(it)} kW") }
-                    rangeKm?.let { append(" · $it km") }
+                    timeToFullMinutes?.takeIf { it > 0 }?.let { append(" · full in ${formatEta(it)}") }
                 },
                 style = MaterialTheme.typography.caption2,
                 color = ZkrGreen,
@@ -285,6 +287,10 @@ private fun relativeUpdatedLabel(deltaMs: Long): String {
 
 private fun formatKw(kw: Double): String =
     if (kw >= 10) kw.roundToInt().toString() else String.format("%.1f", kw)
+
+/** Minutes-to-full as a compact "45m" / "2h05" for the charging line. */
+private fun formatEta(minutes: Int): String =
+    if (minutes < 60) "${minutes}m" else "${minutes / 60}h${String.format("%02d", minutes % 60)}"
 
 /** A green lightning bolt that gently pulses — the "charging" cue. */
 @Composable
