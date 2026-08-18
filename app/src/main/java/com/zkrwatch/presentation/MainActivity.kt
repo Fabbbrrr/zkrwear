@@ -8,6 +8,8 @@ import android.view.HapticFeedbackConstants
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -15,8 +17,12 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.wear.compose.foundation.SwipeToDismissValue
+import androidx.wear.compose.foundation.rememberSwipeToDismissBoxState
+import androidx.wear.compose.material.SwipeToDismissBox
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -74,11 +80,26 @@ fun WearApp() {
     ZkrTheme {
         if (showSettings) {
             BackHandler { showSettings = false }
-            SettingsScreen(
-                enabledSlots = enabledSlots,
-                onToggle = vm::toggleSlot,
-                onClose = { showSettings = false },
-            )
+            // Standard Wear edge-swipe-to-dismiss: drag the settings screen off to
+            // go back, with the native follow-the-finger animation.
+            val dismissState = rememberSwipeToDismissBoxState()
+            LaunchedEffect(dismissState.currentValue) {
+                if (dismissState.currentValue == SwipeToDismissValue.Dismissed) {
+                    showSettings = false
+                    dismissState.snapTo(SwipeToDismissValue.Default)
+                }
+            }
+            SwipeToDismissBox(state = dismissState) { isBackground ->
+                if (isBackground) {
+                    Box(Modifier.fillMaxSize())
+                } else {
+                    SettingsScreen(
+                        enabledSlots = enabledSlots,
+                        onToggle = vm::toggleSlot,
+                        onClose = { showSettings = false },
+                    )
+                }
+            }
         } else {
             VehicleScreen(
                 state = state,
