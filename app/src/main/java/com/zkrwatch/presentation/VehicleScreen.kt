@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +40,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalDensity
@@ -111,7 +114,7 @@ fun VehicleScreen(
                 )
             }
             is VehicleUiState.Ready ->
-                ReadyContent(state, commands, enabledSlots, onAction, onOpenSettings, listState)
+                ReadyContent(state, commands, enabledSlots, onAction, onOpenSettings, onRetry, listState)
         }
     }
 }
@@ -123,6 +126,7 @@ private fun ReadyContent(
     enabledSlots: Set<ActionSlot>,
     onAction: (CommandKind) -> Unit,
     onOpenSettings: () -> Unit,
+    onRefresh: () -> Unit,
     listState: ScalingLazyListState,
 ) {
     val s = state.status
@@ -155,6 +159,7 @@ private fun ReadyContent(
                 charging = s.charging == true,
                 chargePowerKw = s.chargePowerKw,
                 updatedAt = state.updatedAt,
+                onRefresh = onRefresh,
             )
         }
         item {
@@ -184,10 +189,21 @@ private fun SocHero(
     charging: Boolean,
     chargePowerKw: Double?,
     updatedAt: Long,
+    onRefresh: () -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth(),
+        // Long-press the hero to force a status refresh (the poll is otherwise ~60s),
+        // so you can confirm fresh state right before walking to the car.
+        modifier = Modifier.fillMaxWidth().pointerInput(Unit) {
+            detectTapGestures(
+                onLongPress = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onRefresh()
+                },
+            )
+        },
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
