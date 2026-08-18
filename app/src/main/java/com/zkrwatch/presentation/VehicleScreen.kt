@@ -291,7 +291,8 @@ private fun PulsingBolt(modifier: Modifier = Modifier) {
     )
 }
 
-/** Thin green charge bar over a faint track — pulses gently while charging. */
+/** Thin charge bar over a faint track — pulses green while charging, and turns
+ *  amber/red at a low state of charge so a near-flat battery is obvious at a glance. */
 @Composable
 private fun BatteryBar(soc: Int?, charging: Boolean = false) {
     val pulse by rememberInfiniteTransition(label = "bar").animateFloat(
@@ -300,6 +301,13 @@ private fun BatteryBar(soc: Int?, charging: Boolean = false) {
         animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
         label = "barAlpha",
     )
+    // Charging always reads green; otherwise warn as the battery gets low.
+    val fill = when {
+        charging -> ZkrGreen
+        soc != null && soc <= 10 -> ZkrRed
+        soc != null && soc <= 20 -> ZkrAmber
+        else -> ZkrGreen
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth(0.55f)
@@ -313,7 +321,7 @@ private fun BatteryBar(soc: Int?, charging: Boolean = false) {
                 .height(5.dp)
                 .clip(CircleShape)
                 .alpha(if (charging) pulse else 1f)
-                .background(ZkrGreen),
+                .background(fill),
         )
     }
 }
