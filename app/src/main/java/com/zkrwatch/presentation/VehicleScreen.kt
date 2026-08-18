@@ -96,7 +96,13 @@ fun VehicleScreen(
         positionIndicator = { PositionIndicator(scalingLazyListState = listState) },
     ) {
         when (state) {
-            is VehicleUiState.Loading -> CenterMessage { CircularProgressIndicator() }
+            is VehicleUiState.Loading -> CenterMessage {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    Spacer(Modifier.height(8.dp))
+                    Text("Connecting…", textAlign = TextAlign.Center)
+                }
+            }
             is VehicleUiState.NotConfigured -> CenterMessage {
                 Message(
                     "Not set up",
