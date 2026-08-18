@@ -5,10 +5,14 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
@@ -18,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zkrwatch.data.cache.StatusCache
+import com.zkrwatch.data.store.UiPrefsStore
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -33,6 +38,8 @@ fun WearApp() {
     val vm: ZkrViewModel = viewModel(factory = ZkrViewModelFactory(appContext))
     val state by vm.uiState.collectAsStateWithLifecycle()
     val commands by vm.commandStates.collectAsStateWithLifecycle()
+    val enabledSlots by vm.enabledSlots.collectAsStateWithLifecycle()
+    var showSettings by remember { mutableStateOf(false) }
 
     // Poll status only while the screen is RESUMED; never in the background.
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -57,12 +64,23 @@ fun WearApp() {
     }
 
     ZkrTheme {
-        VehicleScreen(
-            state = state,
-            commands = commands,
-            onAction = vm::onAction,
-            onRetry = vm::refresh,
-        )
+        if (showSettings) {
+            BackHandler { showSettings = false }
+            SettingsScreen(
+                enabledSlots = enabledSlots,
+                onToggle = vm::toggleSlot,
+                onClose = { showSettings = false },
+            )
+        } else {
+            VehicleScreen(
+                state = state,
+                commands = commands,
+                enabledSlots = enabledSlots,
+                onAction = vm::onAction,
+                onRetry = vm::refresh,
+                onOpenSettings = { showSettings = true },
+            )
+        }
     }
 }
 
@@ -80,5 +98,5 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 class ZkrViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T =
-        ZkrViewModel(ZkrViewModel.buildRepository(context), StatusCache(context)) as T
+        ZkrViewModel(ZkrViewModel.buildRepository(context), StatusCache(context), UiPrefsStore(context)) as T
 }

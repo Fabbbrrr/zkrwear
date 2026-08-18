@@ -56,6 +56,7 @@ import androidx.wear.compose.material.ButtonColors
 import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
+import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.CircularProgressIndicator
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
@@ -78,10 +79,14 @@ import kotlinx.coroutines.launch
 fun VehicleScreen(
     state: VehicleUiState,
     commands: Map<CommandKind, CommandState>,
+    enabledSlots: Set<ActionSlot>,
     onAction: (CommandKind) -> Unit,
     onRetry: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
-    val listState = rememberScalingLazyListState()
+    // Anchor from the first item (default is 1, which jams the SOC hero under the
+    // TimeText clock); combined with autoCentering=null this top-aligns the content.
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     Scaffold(
         timeText = { TimeText() },
         vignette = { Vignette(vignettePosition = VignettePosition.TopAndBottom) },
@@ -105,7 +110,8 @@ fun VehicleScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            is VehicleUiState.Ready -> ReadyContent(state, commands, onAction, listState)
+            is VehicleUiState.Ready ->
+                ReadyContent(state, commands, enabledSlots, onAction, onOpenSettings, listState)
         }
     }
 }
@@ -114,7 +120,9 @@ fun VehicleScreen(
 private fun ReadyContent(
     state: VehicleUiState.Ready,
     commands: Map<CommandKind, CommandState>,
+    enabledSlots: Set<ActionSlot>,
     onAction: (CommandKind) -> Unit,
+    onOpenSettings: () -> Unit,
     listState: ScalingLazyListState,
 ) {
     val s = state.status
@@ -133,8 +141,11 @@ private fun ReadyContent(
             }
             .focusRequester(focusRequester)
             .focusable(),
-        // Top-anchored + compact so the action row sits high and is easy to tap.
-        contentPadding = PaddingValues(top = 4.dp, bottom = 20.dp, start = 8.dp, end = 8.dp),
+        // Anchor from the top (no auto-centering) so contentPadding.top actually
+        // applies — clears the curved TimeText clock so the SOC hero never collides
+        // with it, while keeping the action row within easy reach.
+        autoCentering = null,
+        contentPadding = PaddingValues(top = 22.dp, bottom = 24.dp, start = 8.dp, end = 8.dp),
     ) {
         item {
             SocHero(
@@ -145,7 +156,22 @@ private fun ReadyContent(
                 chargePowerKw = s.chargePowerKw,
             )
         }
-        item { ActionCluster(status = s, commands = commands, onAction = onAction) }
+        item {
+            ActionCluster(
+                status = s,
+                commands = commands,
+                enabledSlots = enabledSlots,
+                onAction = onAction,
+            )
+        }
+        item {
+            CompactChip(
+                onClick = onOpenSettings,
+                label = { Text("Buttons") },
+                colors = ChipDefaults.secondaryChipColors(),
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
     }
 }
 
@@ -261,20 +287,21 @@ private fun BatteryBar(soc: Int?, charging: Boolean = false) {
 }
 
 /**
- * Row of large icon actions. Lock/Unlock toggles by the car's lock state and
- * Trunk both require a slide-to-confirm (which replaces the row while active);
- * Lock and Climate fire immediately.
+ * The user's enabled icon actions, in [ActionSlot] order. Unlock and Trunk require
+ * a slide-to-confirm (which replaces the cluster while active); Lock, Climate and
+ * Sentry fire immediately. Up to three slots sit on one row; four wrap to a
+ * balanced 2 + 2 so nothing overflows a small round screen.
  */
 @Composable
 private fun ActionCluster(
     status: com.zkrwatch.data.model.VehicleStatus,
     commands: Map<CommandKind, CommandState>,
+    enabledSlots: Set<ActionSlot>,
     onAction: (CommandKind) -> Unit,
 ) {
     val locked = status.locked
-    val climateOn = status.climateActive == true
 
-    // When set, a slide-to-confirm is shown for this action instead of the row.
+    // When set, a slide-to-confirm is shown for this action instead of the cluster.
     var confirm by remember(locked) { mutableStateOf<CommandKind?>(null) }
     // Auto-dismiss the confirm slider if untouched.
     LaunchedEffect(confirm) {
@@ -296,31 +323,82 @@ private fun ActionCluster(
                 onAction(kind)
             }
         } else {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                // The icon shows current lock STATUS: an orange open padlock warns the
-                // car is unlocked (tap to lock); a white closed padlock means locked
-                // (tap to unlock, via slide-to-confirm).
-                if (locked == false) {
-                    IconAction(R.drawable.ic_lock_open, "Lock", ZkrOrange) { onAction(CommandKind.LOCK) }
-                } else {
-                    IconAction(R.drawable.ic_lock, "Unlock") { confirm = CommandKind.UNLOCK }
+            val slots = ActionSlot.entries.filter { it in enabledSlots }
+            if (slots.isNotEmpty()) {
+                // ≤3 slots stay on one row (unchanged layout); 4 wrap to 2 + 2.
+                val twoByTwo = slots.size == 4
+                val perRow = if (slots.size <= 3) slots.size else 2
+                slots.chunked(perRow).forEachIndexed { index, rowSlots ->
+                    if (index > 0) Spacer(Modifier.height(10.dp))
+                    Row(
+                        // The 2×2 grid clusters toward the centre (rather than spreading
+                        // edge-to-edge) so the round screen's curve never clips the
+                        // corner buttons; single rows of ≤3 keep the wide spread.
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = if (twoByTwo) 0.dp else 18.dp),
+                        horizontalArrangement = when {
+                            rowSlots.size == 1 -> Arrangement.Center
+                            twoByTwo -> Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally)
+                            else -> Arrangement.SpaceBetween
+                        },
+                    ) {
+                        rowSlots.forEach { slot ->
+                            SlotButton(
+                                slot = slot,
+                                status = status,
+                                onAction = onAction,
+                                onConfirm = { confirm = it },
+                            )
+                        }
+                    }
                 }
-                IconAction(R.drawable.ic_trunk, "Trunk") { confirm = CommandKind.TRUNK }
-                IconAction(
-                    iconRes = R.drawable.ic_climate,
-                    label = if (climateOn) "Climate" else "Climate",
-                    tint = if (climateOn) ZkrOrange else MaterialTheme.colors.onSurface,
-                    colors = if (climateOn) ButtonDefaults.primaryButtonColors() else ButtonDefaults.secondaryButtonColors(),
-                ) { onAction(CommandKind.CLIMATE) }
             }
         }
 
         statusLine(commands)?.let {
             Spacer(Modifier.height(4.dp))
             Text(it, style = MaterialTheme.typography.caption2, color = ZkrGrey, maxLines = 1)
+        }
+    }
+}
+
+/** Renders one [ActionSlot] as its icon button, wiring immediate vs slide-to-confirm behavior. */
+@Composable
+private fun SlotButton(
+    slot: ActionSlot,
+    status: com.zkrwatch.data.model.VehicleStatus,
+    onAction: (CommandKind) -> Unit,
+    onConfirm: (CommandKind) -> Unit,
+) {
+    when (slot) {
+        // The icon shows current lock STATUS: an orange open padlock warns the car is
+        // unlocked (tap to lock); a white closed padlock means locked (tap to unlock,
+        // via slide-to-confirm).
+        ActionSlot.LOCK ->
+            if (status.locked == false) {
+                IconAction(R.drawable.ic_lock_open, "Lock", ZkrOrange) { onAction(CommandKind.LOCK) }
+            } else {
+                IconAction(R.drawable.ic_lock, "Unlock") { onConfirm(CommandKind.UNLOCK) }
+            }
+        ActionSlot.TRUNK ->
+            IconAction(R.drawable.ic_trunk, "Trunk") { onConfirm(CommandKind.TRUNK) }
+        // Active state is signaled by the orange (primary) button fill; the icon stays
+        // white so it's always legible (an orange tint on the orange fill would vanish).
+        ActionSlot.CLIMATE -> {
+            val on = status.climateActive == true
+            IconAction(
+                iconRes = R.drawable.ic_climate,
+                label = "Climate",
+                colors = if (on) ButtonDefaults.primaryButtonColors() else ButtonDefaults.secondaryButtonColors(),
+            ) { onAction(CommandKind.CLIMATE) }
+        }
+        ActionSlot.SENTRY -> {
+            val on = status.sentryActive == true
+            IconAction(
+                iconRes = R.drawable.ic_sentry,
+                label = "Sentry",
+                colors = if (on) ButtonDefaults.primaryButtonColors() else ButtonDefaults.secondaryButtonColors(),
+            ) { onAction(CommandKind.SENTRY) }
         }
     }
 }
@@ -357,6 +435,7 @@ private fun statusLine(commands: Map<CommandKind, CommandState>): String? {
             CommandKind.UNLOCK -> "Unlocking…"
             CommandKind.TRUNK -> "Opening trunk…"
             CommandKind.CLIMATE -> "Climate…"
+            CommandKind.SENTRY -> "Sentry…"
         }
         CommandState.Success -> "Done ✓"
         is CommandState.Failed -> st.message

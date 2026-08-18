@@ -11,7 +11,14 @@ sealed interface VehicleUiState {
 }
 
 /** The transactional actions on the main screen. Lock/Unlock share one toggle. */
-enum class CommandKind { LOCK, UNLOCK, TRUNK, CLIMATE }
+enum class CommandKind { LOCK, UNLOCK, TRUNK, CLIMATE, SENTRY }
+
+/**
+ * A personalizable button on the main screen — the unit users show/hide. Distinct
+ * from [CommandKind]: the LOCK slot renders either Lock or Unlock depending on the
+ * car's lock state. Order here is the on-screen order. See [com.zkrwatch.data.store.UiPrefsStore].
+ */
+enum class ActionSlot { LOCK, TRUNK, CLIMATE, SENTRY }
 
 /** Per-command progress, used to drive control visuals. */
 sealed interface CommandState {

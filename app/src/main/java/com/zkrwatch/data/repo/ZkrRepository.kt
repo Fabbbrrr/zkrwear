@@ -47,10 +47,43 @@ class ZkrRepository(
     }
 
     suspend fun status(vin: String): VehicleStatus = io {
+        VehicleStatus.from(fetchStatusData(vin))
+    }
+
+    /**
+     * Vehicle status plus the extras that live on separate endpoints — currently
+     * the remote-control state (sentry mode). The extra fetch is best-effort: a
+     * failure leaves those fields null rather than breaking the whole refresh.
+     */
+    suspend fun statusWithExtras(vin: String): VehicleStatus = io {
+        val data = fetchStatusData(vin).toMutableMap()
+        // Sentry state comes from getVehicleState, not status/latest. Merge it under
+        // additionalVehicleStatus.remoteControlState so VehicleStatus.from can read it
+        // (mirrors the HA coordinator merge).
+        runCatching { fetchRemoteControlState(vin) }.getOrNull()?.let { rcs ->
+            @Suppress("UNCHECKED_CAST")
+            val avs = ((data["additionalVehicleStatus"] as? Map<String, Any?>) ?: emptyMap())
+                .toMutableMap()
+            avs["remoteControlState"] = rcs
+            data["additionalVehicleStatus"] = avs
+        }
+        VehicleStatus.from(data)
+    }
+
+    /** Raw `data` object of status/latest. Non-suspend so it composes under a single [io] lock. */
+    private fun fetchStatusData(vin: String): Map<String, Any?> {
         val url = "${server()}${ZkrConst.VEHICLESTATUS_URL}?latest=false&target=new"
         val resp = http.appSignedGet(url, extraHeaders = mapOf("X-VIN" to session.encryptedVin(vin)))
         if (!resp.isSuccess()) throw ZkrException("Failed to get vehicle status: $resp")
-        VehicleStatus.from(resp.child("data") ?: emptyMap())
+        return resp.child("data") ?: emptyMap()
+    }
+
+    /** Raw `data` of getVehicleState (holds `vstdModeState` for sentry). Null on failure. */
+    private fun fetchRemoteControlState(vin: String): Map<String, Any?>? {
+        val url = "${server()}${ZkrConst.REMOTECONTROLSTATE_URL}"
+        val resp = http.appSignedGet(url, extraHeaders = mapOf("X-VIN" to session.encryptedVin(vin)))
+        if (!resp.isSuccess()) return null
+        return resp.child("data")
     }
 
     suspend fun lock(vin: String): Boolean =
@@ -82,6 +115,15 @@ class ZkrRepository(
         val setting = linkedMapOf<String, Any?>("serviceParameters" to params)
         return remoteControl(vin, command = "start", serviceId = "ZAF", setting)
     }
+
+    /** Arms/disarms sentry (surveillance) mode. serviceId RSM; only the verb differs. */
+    suspend fun setSentry(vin: String, on: Boolean): Boolean =
+        remoteControl(
+            vin,
+            command = if (on) "start" else "stop",
+            serviceId = "RSM",
+            setting = linkedMapOf("serviceParameters" to listOf(param("rsm", "6"))),
+        )
 
     private suspend fun remoteControl(
         vin: String,

@@ -20,6 +20,7 @@ data class VehicleStatus(
     val charging: Boolean?,
     val pluggedIn: Boolean?,
     val chargePowerKw: Double?,
+    val sentryActive: Boolean?,
 ) {
     companion object {
         fun from(data: Map<String, Any?>): VehicleStatus {
@@ -50,6 +51,9 @@ data class VehicleStatus(
                 charging = charging,
                 pluggedIn = data.boolAt(avs, ev, "isPluggedIn"),
                 chargePowerKw = powerKw,
+                // Sentry: remoteControlState.vstdModeState, "1"=on / "0"=off (merged in
+                // by ZkrRepository.statusWithExtras; absent -> null/unknown).
+                sentryActive = data.boolAt(avs, "remoteControlState", "vstdModeState"),
             )
         }
     }

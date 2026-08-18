@@ -8,6 +8,7 @@ import com.zkrwatch.data.cache.StatusCache
 import com.zkrwatch.data.net.ZkrKeys
 import com.zkrwatch.data.repo.ZkrRepository
 import com.zkrwatch.data.store.ConfigStore
+import com.zkrwatch.data.store.UiPrefsStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,12 +25,27 @@ import kotlinx.coroutines.launch
 class ZkrViewModel(
     private val repo: ZkrRepository?,
     private val statusCache: StatusCache? = null,
+    private val uiPrefs: UiPrefsStore? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<VehicleUiState>(
         if (repo == null) VehicleUiState.NotConfigured else VehicleUiState.Loading,
     )
     val uiState: StateFlow<VehicleUiState> = _uiState.asStateFlow()
+
+    /** Which action buttons the user has chosen to show. All enabled by default. */
+    private val _enabledSlots = MutableStateFlow(
+        uiPrefs?.enabledSlots() ?: ActionSlot.entries.toSet(),
+    )
+    val enabledSlots: StateFlow<Set<ActionSlot>> = _enabledSlots.asStateFlow()
+
+    fun toggleSlot(slot: ActionSlot) {
+        val next = _enabledSlots.value.toMutableSet().apply {
+            if (!add(slot)) remove(slot)
+        }
+        _enabledSlots.value = next
+        uiPrefs?.setEnabled(next)
+    }
 
     private val _commandStates = MutableStateFlow(
         CommandKind.entries.associateWith { CommandState.Idle } as Map<CommandKind, CommandState>,
@@ -47,7 +63,7 @@ class ZkrViewModel(
                 if (_uiState.value !is VehicleUiState.Ready) _uiState.value = VehicleUiState.Loading
                 repo.connect()
                 val v = vin ?: repo.firstVin().also { vin = it }
-                val status = repo.status(v)
+                val status = repo.statusWithExtras(v)
                 statusCache?.write(v, status)
                 _uiState.value = VehicleUiState.Ready(v, status)
             } catch (e: Exception) {
@@ -74,12 +90,27 @@ class ZkrViewModel(
                         val active = (uiState.value as? VehicleUiState.Ready)?.status?.climateActive ?: false
                         repo.climate(v, on = !active)
                     }
+                    CommandKind.SENTRY -> {
+                        val active = (uiState.value as? VehicleUiState.Ready)?.status?.sentryActive ?: false
+                        repo.setSentry(v, on = !active)
+                    }
                 }
                 setCommand(kind, if (ok) CommandState.Success else CommandState.Failed("Rejected"))
-                // Reflect the car's new state.
-                repo.status(v).let {
-                    statusCache?.write(v, it)
-                    _uiState.value = VehicleUiState.Ready(v, it)
+                if (ok && kind == CommandKind.SENTRY) {
+                    // The sentry state endpoint lags after a toggle, so an immediate refetch
+                    // reads stale state (same reason HA writes optimistically). Flip locally;
+                    // the next poll reconciles the real value.
+                    (uiState.value as? VehicleUiState.Ready)?.let { ready ->
+                        val flipped = ready.status.copy(sentryActive = !(ready.status.sentryActive ?: false))
+                        statusCache?.write(v, flipped)
+                        _uiState.value = VehicleUiState.Ready(v, flipped)
+                    }
+                } else {
+                    // Reflect the car's new state.
+                    repo.statusWithExtras(v).let {
+                        statusCache?.write(v, it)
+                        _uiState.value = VehicleUiState.Ready(v, it)
+                    }
                 }
             } catch (e: Exception) {
                 setCommand(kind, CommandState.Failed(e.message ?: "Failed"))
