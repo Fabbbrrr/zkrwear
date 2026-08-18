@@ -15,13 +15,36 @@ vehicle's cloud service, so no Home Assistant, companion phone app, or VPN is re
 
 ## Features
 
+**Vehicle status**
+
 - 🔋 **Battery % + range**, live from the vehicle's cloud
-- ⚡ **Charging indicator** with the live charge rate (kW)
-- 🔒 **Lock** / 🔓 **Unlock** (slide-to-confirm) and current lock state
+- ⚡ **Charging indicator** with the live charge rate (kW) and **time-to-full ETA**
+- 🌡️ **Cabin temperature** shown on the Climate button
+- 🟠 **Low-battery warning** — the charge bar turns amber/red as it runs low
+- 🕒 **"Updated ago"** freshness cue so you know how current the reading is
+- 🔒 Current **lock state** at a glance
+
+**Remote controls**
+
+- 🔒 **Lock** / 🔓 **Unlock** (slide-to-confirm)
 - 🚗 **Open trunk** (slide-to-confirm)
 - ❄️ **Climate** precondition toggle
-- 🧩 **Tile** (glanceable battery) and **watch-face complication** (SOC)
-- 🎛️ **Rotating bezel / crown** scrolling
+- 🛡️ **Sentry Mode** — arm/disarm the car's surveillance mode
+- 💡 **Flash lights** to find the car in a car park *(opt-in)*
+- 🔌 **Start / stop charging** *(opt-in)*
+- 📳 **Haptic feedback** and an **in-place progress ring** while a command runs
+- ⚠️ Clear, cause-specific errors (*Car unreachable*, *Sign-in expired*, *Car declined*)
+
+**Personalization & glanceability**
+
+- 🎛️ **Customizable buttons** — show/hide any action from the **Buttons** screen so small
+  watches stay uncluttered
+- 🧩 **Tile** (glanceable battery, **with Lock/Unlock**) and **watch-face complication** (SOC)
+- 🔄 **Long-press the battery** to force a refresh
+- 👆 **Rotating bezel / crown** scrolling and **swipe-to-dismiss** settings
+
+**Under the hood**
+
 - 🔐 Credentials stored in the watch's **hardware-backed Keystore**
 - 📶 Works over watch Wi-Fi/LTE **or** the phone's Bluetooth data proxy — no VPN
 
