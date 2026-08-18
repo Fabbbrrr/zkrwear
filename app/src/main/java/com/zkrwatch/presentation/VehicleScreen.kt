@@ -463,6 +463,15 @@ private fun SlotButton(
         // Momentary locate: flashes the blinkers. Fires immediately (harmless).
         ActionSlot.FLASH ->
             IconAction(R.drawable.ic_flash, "Flash") { onAction(CommandKind.FLASH) }
+        // Toggles charging; orange while the car is actively charging.
+        ActionSlot.CHARGING -> {
+            val on = status.charging == true
+            IconAction(
+                iconRes = R.drawable.ic_charge,
+                label = "Charge",
+                colors = if (on) ButtonDefaults.primaryButtonColors() else ButtonDefaults.secondaryButtonColors(),
+            ) { onAction(CommandKind.CHARGING) }
+        }
     }
 }
 
@@ -564,6 +573,7 @@ private fun statusLine(commands: Map<CommandKind, CommandState>): String? {
             CommandKind.CLIMATE -> "Climate…"
             CommandKind.SENTRY -> "Sentry…"
             CommandKind.FLASH -> "Flashing…"
+            CommandKind.CHARGING -> "Charge…"
         }
         CommandState.Success -> "Done ✓"
         is CommandState.Failed -> st.message

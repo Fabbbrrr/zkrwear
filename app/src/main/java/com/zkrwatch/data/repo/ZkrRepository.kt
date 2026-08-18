@@ -134,6 +134,20 @@ class ZkrRepository(
             setting = linkedMapOf("serviceParameters" to listOf(param("rsm", "6"))),
         )
 
+    /**
+     * Starts/stops charging (serviceId RCS → charge-control endpoint). Uses the same
+     * rcs.restart / rcs.terminate parameters as the HA integration.
+     */
+    suspend fun setCharging(vin: String, on: Boolean): Boolean =
+        remoteControl(
+            vin,
+            command = if (on) "start" else "stop",
+            serviceId = "RCS",
+            setting = linkedMapOf(
+                "serviceParameters" to listOf(param(if (on) "rcs.restart" else "rcs.terminate", "1")),
+            ),
+        )
+
     private suspend fun remoteControl(
         vin: String,
         command: String,

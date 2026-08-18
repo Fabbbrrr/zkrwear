@@ -97,6 +97,10 @@ class ZkrViewModel(
                         repo.setSentry(v, on = !active)
                     }
                     CommandKind.FLASH -> repo.flashLights(v)
+                    CommandKind.CHARGING -> {
+                        val active = (uiState.value as? VehicleUiState.Ready)?.status?.charging ?: false
+                        repo.setCharging(v, on = !active)
+                    }
                 }
                 setCommand(kind, if (ok) CommandState.Success else CommandState.Failed("Car declined"))
                 if (ok && kind == CommandKind.SENTRY) {
