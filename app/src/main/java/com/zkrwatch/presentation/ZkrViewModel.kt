@@ -5,10 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.zkrwatch.BuildConfig
 import com.zkrwatch.data.ZkrClientFactory
 import com.zkrwatch.data.cache.StatusCache
+import com.zkrwatch.data.net.AuthException
 import com.zkrwatch.data.net.ZkrKeys
 import com.zkrwatch.data.repo.ZkrRepository
 import com.zkrwatch.data.store.ConfigStore
 import com.zkrwatch.data.store.UiPrefsStore
+import java.io.IOException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,7 +69,7 @@ class ZkrViewModel(
                 statusCache?.write(v, status)
                 _uiState.value = VehicleUiState.Ready(v, status)
             } catch (e: Exception) {
-                _uiState.value = VehicleUiState.Error(e.message ?: "Connection failed")
+                _uiState.value = VehicleUiState.Error(friendlyError(e))
             }
         }
     }
@@ -95,7 +97,7 @@ class ZkrViewModel(
                         repo.setSentry(v, on = !active)
                     }
                 }
-                setCommand(kind, if (ok) CommandState.Success else CommandState.Failed("Rejected"))
+                setCommand(kind, if (ok) CommandState.Success else CommandState.Failed("Car declined"))
                 if (ok && kind == CommandKind.SENTRY) {
                     // The sentry state endpoint lags after a toggle, so an immediate refetch
                     // reads stale state (same reason HA writes optimistically). Flip locally;
@@ -113,7 +115,7 @@ class ZkrViewModel(
                     }
                 }
             } catch (e: Exception) {
-                setCommand(kind, CommandState.Failed(e.message ?: "Failed"))
+                setCommand(kind, CommandState.Failed(friendlyError(e)))
             } finally {
                 viewModelScope.launch {
                     delay(RESULT_LINGER_MS)
@@ -125,6 +127,18 @@ class ZkrViewModel(
 
     private fun setCommand(kind: CommandKind, state: CommandState) {
         _commandStates.update { it + (kind to state) }
+    }
+
+    /**
+     * Turns a thrown error into a short, human message that distinguishes the cause:
+     * a transport failure (no network / car's cloud unreachable) surfaces differently
+     * from an expired session or a generic server error. A command the gateway
+     * actively declined is reported as "Car declined" at the call site (no exception).
+     */
+    private fun friendlyError(e: Throwable): String = when {
+        e is IOException -> "Car unreachable"
+        e is AuthException -> "Sign-in expired"
+        else -> e.message ?: "Failed"
     }
 
     companion object {
