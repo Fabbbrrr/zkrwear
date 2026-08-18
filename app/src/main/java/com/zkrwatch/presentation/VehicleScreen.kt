@@ -322,6 +322,15 @@ private fun ActionCluster(
                 confirm = null
                 onAction(kind)
             }
+        } else if (enabledSlots.isEmpty()) {
+            // Every button is hidden — point the user at where to bring them back.
+            Text(
+                text = "All buttons hidden.\nTap Buttons to add controls.",
+                style = MaterialTheme.typography.caption2,
+                color = ZkrGrey,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            )
         } else {
             val slots = ActionSlot.entries.filter { it in enabledSlots }
             if (slots.isNotEmpty()) {
