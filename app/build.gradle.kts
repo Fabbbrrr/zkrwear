@@ -105,6 +105,9 @@ dependencies {
     implementation(libs.protolayout.expression)
     implementation(libs.guava)
 
+    // Background command execution from the Tile (lock/unlock without opening the app)
+    implementation(libs.work.runtime.ktx)
+
     // Secure session storage (M5)
     implementation(libs.tink.android)
 

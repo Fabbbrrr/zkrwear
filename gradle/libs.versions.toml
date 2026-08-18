@@ -24,6 +24,7 @@ wearTiles = "1.4.1"
 protolayout = "1.2.1"
 watchfaceComplications = "1.2.1"
 horologist = "0.6.17"
+work = "2.9.1"
 
 # Test
 junit = "4.13.2"
@@ -63,6 +64,7 @@ protolayout-material = { group = "androidx.wear.protolayout", name = "protolayou
 protolayout-expression = { group = "androidx.wear.protolayout", name = "protolayout-expression", version.ref = "protolayout" }
 watchface-complications-data-source-ktx = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version.ref = "watchfaceComplications" }
 horologist-compose-layout = { group = "com.google.android.horologist", name = "horologist-compose-layout", version.ref = "horologist" }
+work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 

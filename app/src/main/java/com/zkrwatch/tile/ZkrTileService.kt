@@ -9,34 +9,58 @@ import androidx.wear.protolayout.LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER
 import androidx.wear.protolayout.ModifiersBuilders
 import androidx.wear.protolayout.ResourceBuilders
 import androidx.wear.protolayout.TimelineBuilders
+import androidx.wear.protolayout.material.CompactChip
 import androidx.wear.protolayout.material.Text
 import androidx.wear.protolayout.material.Typography
 import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.zkrwatch.data.cache.StatusCache
 import com.zkrwatch.presentation.MainActivity
 
 /**
- * Glanceable Tile: Zkr SOC + range from the [StatusCache], tap to open the app.
- * Renders instantly from cache (no network on the tile path) and asks for a
- * refresh every 30 min.
+ * Glanceable Tile: Zkr SOC + range from the [StatusCache], with a Lock/Unlock
+ * button and tap-elsewhere-to-open. Renders instantly from cache (no network on
+ * the tile path) and asks for a refresh every 30 min.
  *
- * NOTE: background Lock/Unlock buttons directly on the tile are deferred to M5 —
- * they need a WorkManager command path (a tile clickable can enqueue a worker via
- * a LoadAction) so the action runs without opening the app. Until then the tile
- * is glance + tap-to-open.
+ * The Lock/Unlock button runs without opening the app: its clickable is a
+ * LoadAction, so the tap reloads the tile; [onTileRequest] sees the clicked id and
+ * enqueues [CommandWorker], which performs the command and refreshes the tile.
  */
 class ZkrTileService : TileService() {
 
     override fun onTileRequest(
         requestParams: RequestBuilders.TileRequest,
     ): ListenableFuture<TileBuilders.Tile> {
+        // If a Lock/Unlock button was tapped, run the command in the background.
+        val clickedId = requestParams.currentState.lastClickableId
+        if (clickedId == CommandWorker.ACTION_LOCK || clickedId == CommandWorker.ACTION_UNLOCK) {
+            WorkManager.getInstance(this).enqueue(
+                OneTimeWorkRequestBuilder<CommandWorker>()
+                    .setInputData(workDataOf(CommandWorker.KEY_ACTION to clickedId))
+                    .build(),
+            )
+        }
+
         val cached = StatusCache(this).read()
         val soc = cached.socPercent?.let { "$it%" } ?: "--"
         val range = cached.rangeKm?.let { "$it km" } ?: "range —"
+
+        // When the car is unlocked the useful action is Lock; otherwise Unlock.
+        val actionIsLock = cached.locked == false
+        val lockLabel = if (actionIsLock) "Lock" else "Unlock"
+        val lockId = if (actionIsLock) CommandWorker.ACTION_LOCK else CommandWorker.ACTION_UNLOCK
+        val lockClickable = ModifiersBuilders.Clickable.Builder()
+            .setId(lockId)
+            .setOnClick(ActionBuilders.LoadAction.Builder().build())
+            .build()
+        val lockChip = CompactChip.Builder(this, lockLabel, lockClickable, requestParams.deviceConfiguration)
+            .build()
 
         val openApp = ModifiersBuilders.Clickable.Builder()
             .setId("open")
@@ -82,6 +106,11 @@ class ZkrTileService : TileService() {
                         Text.Builder(this, range)
                             .setTypography(Typography.TYPOGRAPHY_CAPTION1).setColor(grey).build(),
                     )
+                    .addContent(
+                        LayoutElementBuilders.Spacer.Builder()
+                            .setHeight(androidx.wear.protolayout.DimensionBuilders.dp(6f)).build(),
+                    )
+                    .addContent(lockChip)
                     .build(),
             )
             .build()
