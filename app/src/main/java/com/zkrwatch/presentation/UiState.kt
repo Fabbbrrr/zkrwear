@@ -7,7 +7,11 @@ sealed interface VehicleUiState {
     data object Loading : VehicleUiState
     data object NotConfigured : VehicleUiState
     data class Error(val message: String) : VehicleUiState
-    data class Ready(val vin: String, val status: VehicleStatus) : VehicleUiState
+    data class Ready(
+        val vin: String,
+        val status: VehicleStatus,
+        val updatedAt: Long = System.currentTimeMillis(),
+    ) : VehicleUiState
 }
 
 /** The transactional actions on the main screen. Lock/Unlock share one toggle. */
