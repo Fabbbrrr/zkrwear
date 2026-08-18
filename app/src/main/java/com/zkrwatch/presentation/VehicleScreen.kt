@@ -154,6 +154,7 @@ private fun ReadyContent(
                 locked = s.locked,
                 charging = s.charging == true,
                 chargePowerKw = s.chargePowerKw,
+                updatedAt = state.updatedAt,
             )
         }
         item {
@@ -182,6 +183,7 @@ private fun SocHero(
     locked: Boolean?,
     charging: Boolean,
     chargePowerKw: Double?,
+    updatedAt: Long,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -232,6 +234,36 @@ private fun SocHero(
                 textAlign = TextAlign.Center,
             )
         }
+        RelativeUpdated(updatedAt)
+    }
+}
+
+/** Tiny "updated Xm ago" freshness cue — remote data lags, so show how fresh it is. */
+@Composable
+private fun RelativeUpdated(updatedAt: Long) {
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    // Re-tick so the label keeps counting up even if polling pauses.
+    LaunchedEffect(updatedAt) {
+        while (true) {
+            now = System.currentTimeMillis()
+            kotlinx.coroutines.delay(20_000)
+        }
+    }
+    Text(
+        text = relativeUpdatedLabel((now - updatedAt).coerceAtLeast(0)),
+        style = MaterialTheme.typography.caption2,
+        color = ZkrGrey.copy(alpha = 0.7f),
+        fontSize = 10.sp,
+        textAlign = TextAlign.Center,
+    )
+}
+
+private fun relativeUpdatedLabel(deltaMs: Long): String {
+    val mins = deltaMs / 60_000
+    return when {
+        deltaMs < 45_000 -> "Updated just now"
+        mins < 60 -> "Updated ${mins.coerceAtLeast(1)}m ago"
+        else -> "Updated ${mins / 60}h ago"
     }
 }
 
