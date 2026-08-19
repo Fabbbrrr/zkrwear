@@ -358,8 +358,8 @@ private fun BatteryBar(soc: Int?, charging: Boolean = false) {
  * The user's enabled icon actions, in [ActionSlot] order. Unlock and Trunk require
  * a slide-to-confirm (which replaces the cluster while active); Lock, Climate and
  * Sentry fire immediately (Sentry shows On/Off and toggles). Up to three slots
- * sit on one row; four wrap to a balanced 2 + 2 so nothing overflows a small
- * round screen.
+ * sit on one row; four or more wrap to centred rows of two so nothing overflows
+ * a small round screen.
  */
 @Composable
 private fun ActionCluster(
@@ -403,20 +403,21 @@ private fun ActionCluster(
         } else {
             val slots = ActionSlot.entries.filter { it in enabledSlots }
             if (slots.isNotEmpty()) {
-                // ≤3 slots stay on one row (unchanged layout); 4 wrap to 2 + 2.
-                val twoByTwo = slots.size == 4
-                val perRow = if (slots.size <= 3) slots.size else 2
+                // ≤3 slots stay on one row (wide spread); 4+ wrap to rows of two.
+                val wrap = slots.size > 3
+                val perRow = if (wrap) 2 else slots.size
                 slots.chunked(perRow).forEachIndexed { index, rowSlots ->
                     if (index > 0) Spacer(Modifier.height(10.dp))
                     Row(
-                        // The 2×2 grid clusters toward the centre (rather than spreading
-                        // edge-to-edge) so the round screen's curve never clips the
-                        // corner buttons; single rows of ≤3 keep the wide spread.
+                        // Wrapped rows (4+ slots) are centred with a small gap so the
+                        // buttons grow outward from the middle instead of hugging the rim
+                        // of the round screen; a lone trailing button centres too. Single
+                        // rows of ≤3 keep the wide edge-to-edge spread.
                         modifier = Modifier.fillMaxWidth()
-                            .padding(horizontal = if (twoByTwo) 0.dp else 18.dp),
+                            .padding(horizontal = if (wrap) 0.dp else 18.dp),
                         horizontalArrangement = when {
                             rowSlots.size == 1 -> Arrangement.Center
-                            twoByTwo -> Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally)
+                            wrap -> Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
                             else -> Arrangement.SpaceBetween
                         },
                     ) {
