@@ -63,14 +63,11 @@ class ZkrViewModel(
         refreshJob = viewModelScope.launch {
             try {
                 if (_uiState.value !is VehicleUiState.Ready) _uiState.value = VehicleUiState.Loading
-                android.util.Log.i(TAG, "refresh: connecting")
                 repo.connect()
                 val v = vin ?: repo.firstVin().also { vin = it }
-                android.util.Log.i(TAG, "refresh: vin=$v fetching status")
                 val status = repo.statusWithExtras(v)
                 statusCache?.write(v, status)
                 _uiState.value = VehicleUiState.Ready(v, status)
-                android.util.Log.i(TAG, "refresh: ready sentry=${status.sentryActive}")
             } catch (e: Exception) {
                 android.util.Log.w(TAG, "refresh failed: ${e.javaClass.simpleName}: ${e.message}")
                 _uiState.value = VehicleUiState.Error(friendlyError(e))
