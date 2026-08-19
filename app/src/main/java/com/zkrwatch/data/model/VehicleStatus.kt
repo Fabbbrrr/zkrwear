@@ -23,18 +23,28 @@ data class VehicleStatus(
     val sentryActive: Boolean?,
 ) {
     companion object {
+        /** Min charge power (kW) that counts as "actually charging" — filters sensor noise. */
+        private const val CHARGE_KW_MIN = 0.1
+
         fun from(data: Map<String, Any?>): VehicleStatus {
             val avs = "additionalVehicleStatus"
             val ev = "electricVehicleStatus"
             // Lock lives under drivingSafetyStatus; value is "1" (locked) / "0".
             val locking = data.path(avs, "drivingSafetyStatus", "centralLockingStatus")?.toString()?.trim()
-            val charging = data.boolAt(avs, ev, "isCharging")
 
             // Charge power (kW) from instantaneous volts × amps: AC (chargeUAct/chargeIAct)
-            // or DC pile (dcChargePileUAct/dcChargePileIAct). Only meaningful while charging.
+            // or DC pile (dcChargePileUAct/dcChargePileIAct).
             val acKw = (data.numAt(avs, ev, "chargeUAct") ?: 0.0) * (data.numAt(avs, ev, "chargeIAct") ?: 0.0) / 1000.0
             val dcKw = (data.numAt(avs, ev, "dcChargePileUAct") ?: 0.0) * (data.numAt(avs, ev, "dcChargePileIAct") ?: 0.0) / 1000.0
-            val powerKw = maxOf(acKw, dcKw).takeIf { charging == true && it > 0.1 }
+            val chargeKw = maxOf(acKw, dcKw)
+
+            // `isCharging` alone is unreliable: some cars report it false while actively
+            // AC-charging (observed: isCharging=false with chargeUAct=230, chargeIAct=9.8,
+            // i.e. ~2.3 kW flowing into the pack, and a live timeToFullyCharged). Treat
+            // the car as charging when the flag is set OR when measurable current is
+            // actually going in, so the charging cue isn't silently missed.
+            val charging = data.boolAt(avs, ev, "isCharging") == true || chargeKw > CHARGE_KW_MIN
+            val powerKw = chargeKw.takeIf { charging && it > CHARGE_KW_MIN }
 
             return VehicleStatus(
                 socPercent = data.numAt(avs, ev, "chargeLevel")?.toInt(),
