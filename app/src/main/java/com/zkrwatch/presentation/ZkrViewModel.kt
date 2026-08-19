@@ -69,6 +69,7 @@ class ZkrViewModel(
                 statusCache?.write(v, status)
                 _uiState.value = VehicleUiState.Ready(v, status)
             } catch (e: Exception) {
+                android.util.Log.w(TAG, "refresh failed: ${e.javaClass.simpleName}: ${e.message}")
                 _uiState.value = VehicleUiState.Error(friendlyError(e))
             }
         }
@@ -148,6 +149,7 @@ class ZkrViewModel(
     }
 
     companion object {
+        private const val TAG = "ZkrWatch"
         private const val RESULT_LINGER_MS = 2_500L
 
         /**

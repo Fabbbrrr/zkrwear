@@ -51,10 +51,22 @@ data class VehicleStatus(
                 charging = charging,
                 pluggedIn = data.boolAt(avs, ev, "isPluggedIn"),
                 chargePowerKw = powerKw,
-                // Sentry: remoteControlState.vstdModeState, "1"=on / "0"=off (merged in
-                // by ZkrRepository.statusWithExtras; absent -> null/unknown).
-                sentryActive = data.boolAt(avs, "remoteControlState", "vstdModeState"),
+                // Sentry: remoteControlState.vstdModeState (merged in by
+                // ZkrRepository.statusWithExtras). Absent -> null/unknown.
+                sentryActive = sentryState(data.path(avs, "remoteControlState", "vstdModeState")),
             )
+        }
+
+        /** "1" / 1 / true / on → armed; "0" / 0 / false / off → disarmed; else unknown. */
+        private fun sentryState(v: Any?): Boolean? = when (v) {
+            is Boolean -> v
+            is Number -> v.toInt() != 0
+            is String -> when (v.trim().lowercase()) {
+                "1", "1.0", "true", "on" -> true
+                "0", "0.0", "false", "off" -> false
+                else -> v.toDoubleOrNull()?.let { it.toInt() != 0 }
+            }
+            else -> null
         }
     }
 }
