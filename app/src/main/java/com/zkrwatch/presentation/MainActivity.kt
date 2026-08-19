@@ -3,6 +3,7 @@ package com.zkrwatch.presentation
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.HapticFeedbackConstants
@@ -43,10 +44,14 @@ import kotlinx.coroutines.delay
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Wear OS 5 returns to the watch face after a few seconds of no touch
-        // (ambient, then auto-resume). Keep this activity interactive while it
-        // is in the foreground so login/status can finish and the user can tap.
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Wear OS 5 (Android 14+) returns to the watch face after a few seconds of
+        // no touch (ambient, then auto-resume). Keep this activity interactive while
+        // it is in the foreground so login/status can finish and the user can tap.
+        // Scoped to Wear OS 5+ so older watches (Galaxy Watch 4/5 on Wear OS 3/4)
+        // keep their normal ambient/timeout behaviour.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
         setContent { WearApp() }
     }
 }
