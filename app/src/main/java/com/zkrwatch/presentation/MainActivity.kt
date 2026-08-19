@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.os.Bundle
+import android.provider.Settings
 import android.view.HapticFeedbackConstants
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -88,9 +89,20 @@ fun WearApp() {
     }
 
     // Wear Compose 1.3.1 reads Settings.Global.reduce_motion inside ScalingLazyColumn.
-    // On Wear OS 5 (API 35) that key is hidden from targetSdk 35 apps and throws
-    // SecurityException, which looks like "the app opened then instantly vanished."
-    CompositionLocalProvider(LocalReduceMotion provides ReduceMotion { false }) {
+    // On Wear OS 5.1 (API 35) that hidden key is unreadable by targetSdk-35 apps and
+    // throws SecurityException, which looked like "the app opened then instantly
+    // vanished." Read it defensively: honor the user's accessibility preference where
+    // the read succeeds (Wear OS 4 and earlier), and fall back to "motion on" only
+    // when the platform blocks the read.
+    val reduceMotion = remember(context) {
+        val enabled = try {
+            Settings.Global.getFloat(context.contentResolver, "reduce_motion", 0f) == 1f
+        } catch (_: SecurityException) {
+            false
+        }
+        ReduceMotion { enabled }
+    }
+    CompositionLocalProvider(LocalReduceMotion provides reduceMotion) {
         ZkrTheme {
             if (showSettings) {
                 BackHandler { showSettings = false }
