@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun SettingsScreen(
-    enabledSlots: Set<ActionSlot>,
+    enabledSlots: List<ActionSlot>,
     onToggle: (ActionSlot) -> Unit,
     onClose: () -> Unit,
 ) {

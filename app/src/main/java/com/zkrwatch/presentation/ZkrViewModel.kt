@@ -36,18 +36,37 @@ class ZkrViewModel(
     )
     val uiState: StateFlow<VehicleUiState> = _uiState.asStateFlow()
 
-    /** Which action buttons the user has chosen to show. All enabled by default. */
+    /**
+     * The action buttons the user shows, in their chosen on-screen order. New slots
+     * append to the end; the edit-mode grid reorders and removes them.
+     */
     private val _enabledSlots = MutableStateFlow(
-        uiPrefs?.enabledSlots() ?: ActionSlot.entries.filter { it.defaultVisible }.toSet(),
+        uiPrefs?.enabledOrder() ?: ActionSlot.entries.filter { it.defaultVisible },
     )
-    val enabledSlots: StateFlow<Set<ActionSlot>> = _enabledSlots.asStateFlow()
+    val enabledSlots: StateFlow<List<ActionSlot>> = _enabledSlots.asStateFlow()
 
+    /** Show/hide a slot (the settings toggles). Shown slots append to the end. */
     fun toggleSlot(slot: ActionSlot) {
-        val next = _enabledSlots.value.toMutableSet().apply {
-            if (!add(slot)) remove(slot)
-        }
-        _enabledSlots.value = next
-        uiPrefs?.setEnabled(next)
+        val cur = _enabledSlots.value
+        setSlots(if (slot in cur) cur - slot else cur + slot)
+    }
+
+    /** Remove a slot from the grid — the minus badge in edit mode. */
+    fun removeSlot(slot: ActionSlot) {
+        val cur = _enabledSlots.value
+        if (slot in cur) setSlots(cur - slot)
+    }
+
+    /** Move the slot at [from] to index [to] — drag-to-reorder in edit mode. */
+    fun moveSlot(from: Int, to: Int) {
+        val cur = _enabledSlots.value
+        if (from !in cur.indices || to !in cur.indices || from == to) return
+        setSlots(cur.toMutableList().apply { add(to, removeAt(from)) })
+    }
+
+    private fun setSlots(slots: List<ActionSlot>) {
+        _enabledSlots.value = slots
+        uiPrefs?.setOrder(slots)
     }
 
     private val _commandStates = MutableStateFlow(

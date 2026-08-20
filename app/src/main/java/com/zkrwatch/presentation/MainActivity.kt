@@ -142,6 +142,8 @@ fun WearApp() {
                     },
                     onRetry = vm::refresh,
                     onOpenSettings = { showSettings = true },
+                    onMoveSlot = vm::moveSlot,
+                    onRemoveSlot = vm::removeSlot,
                 )
             }
         }
