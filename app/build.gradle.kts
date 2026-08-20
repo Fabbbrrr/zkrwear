@@ -26,8 +26,8 @@ android {
         applicationId = "com.zkrwatch"
         minSdk = 30          // Wear OS 3+; covers Galaxy Watch 4 and up
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         // Injected at build time from keys.properties. BuildConfig.* at runtime.
         buildConfigField("String", "HMAC_ACCESS_KEY", "\"${key("HMAC_ACCESS_KEY")}\"")
