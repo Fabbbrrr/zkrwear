@@ -83,6 +83,7 @@ import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
 import androidx.wear.compose.material.Vignette
 import androidx.wear.compose.material.VignettePosition
+import com.zkrwatch.BuildConfig
 import com.zkrwatch.R
 import com.zkrwatch.data.update.UpdateInfo
 import kotlin.math.roundToInt
@@ -235,6 +236,17 @@ private fun ReadyContent(
                     modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                 )
             }
+        }
+        // Installed version, small and unobtrusive at the very bottom.
+        item {
+            Text(
+                text = "v${BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.caption2,
+                color = ZkrGrey.copy(alpha = 0.6f),
+                fontSize = 9.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
         }
     }
 }

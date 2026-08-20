@@ -55,6 +55,9 @@ vehicle's cloud service, so no Home Assistant, companion phone app, or VPN is re
 - 🧩 **Tile** (glanceable battery, **with Lock/Unlock**) and **watch-face complication** (SOC)
 - 🔄 **Long-press the battery** to force a refresh
 - 👆 **Rotating bezel / crown** scrolling and **swipe-to-dismiss** settings
+- ⬆️ **In-app updates** — when a newer GitHub release exists, an **Update** button appears at
+  the bottom; one tap downloads and installs it, no PC needed (official APK only — see
+  [Limitations](#limitations--important-notes))
 
 **Under the hood**
 
@@ -73,6 +76,10 @@ vehicle's cloud service, so no Home Assistant, companion phone app, or VPN is re
   [zeekr_key_extractor](https://github.com/Wysie/zeekr_key_extractor) — the same keys the Home
   Assistant integration uses. They are never bundled in the app.
 - **Sideload only.** The app relies on reverse-engineered keys, so it isn't on the Play Store.
+- **In-app update works for the official APK only.** The **Update** button installs the latest
+  [GitHub release](../../releases), which is signed with the project's key. If you **build the
+  APK yourself** it's signed with *your own* key, so Android won't let it self-update to the
+  official release (signature mismatch) — rebuild from source to update instead.
 - **Unofficial API.** The manufacturer may change the backend at any time and break this app.
 - **Region:** built and tested for **Australia (SEA region)**. Other regions may need endpoint
   or `COUNTRY_CODE` changes.

@@ -1,3 +1,6 @@
+import java.security.KeyStore
+import java.security.MessageDigest
+import java.security.cert.X509Certificate
 import java.util.Properties
 
 plugins {
@@ -26,8 +29,8 @@ android {
         applicationId = "com.zkrwatch"
         minSdk = 30          // Wear OS 3+; covers Galaxy Watch 4 and up
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.3.0"
 
         // Injected at build time from keys.properties. BuildConfig.* at runtime.
         buildConfigField("String", "HMAC_ACCESS_KEY", "\"${key("HMAC_ACCESS_KEY")}\"")
@@ -75,6 +78,53 @@ android {
         compose = true
         buildConfig = true
     }
+}
+
+// --- Release signing consistency guard ---------------------------------------
+// In-app self-update only works if every release is signed with the SAME key —
+// Android rejects an update whose signature differs. This pins the release
+// signing certificate; a release build FAILS if a different keystore/key is used.
+// If ~/.android/debug.keystore is ever lost, self-update breaks for all existing
+// users, so BACK IT UP. See RELEASING.md.
+val expectedReleaseCertSha256 =
+    "E8:9F:4F:29:28:96:4E:81:8F:B2:75:26:27:D5:9E:0A:97:A8:80:25:94:EA:94:2E:E1:4B:B1:C4:5E:9E:44:BE"
+
+val verifyReleaseSigningCert = tasks.register("verifyReleaseSigningCert") {
+    description = "Fails the release build if the signing key differs from the pinned cert (needed for self-update)."
+    doLast {
+        val cfg = android.signingConfigs.getByName("sideload")
+        val ksFile = cfg.storeFile ?: throw GradleException("sideload signingConfig has no storeFile")
+        if (!ksFile.exists()) throw GradleException("Signing keystore not found: $ksFile — see RELEASING.md.")
+        val pass = (cfg.storePassword ?: "").toCharArray()
+        var ks: KeyStore? = null
+        for (type in listOf("PKCS12", "JKS")) {
+            try {
+                val candidate = KeyStore.getInstance(type)
+                ksFile.inputStream().use { candidate.load(it, pass) }
+                ks = candidate
+                break
+            } catch (_: Exception) {
+            }
+        }
+        if (ks == null) throw GradleException("Could not read keystore $ksFile (tried PKCS12/JKS).")
+        val cert = ks.getCertificate(cfg.keyAlias) as X509Certificate
+        val actual = MessageDigest.getInstance("SHA-256")
+            .digest(cert.encoded).joinToString(":") { "%02X".format(it.toInt() and 0xFF) }
+        if (!actual.equals(expectedReleaseCertSha256, ignoreCase = true)) {
+            throw GradleException(
+                "\n  Release signing certificate MISMATCH — self-update would break for existing users.\n" +
+                    "    expected: $expectedReleaseCertSha256\n" +
+                    "    actual:   $actual\n" +
+                    "  Use the original keystore (see RELEASING.md) before cutting a release.\n",
+            )
+        }
+        logger.lifecycle("Release signing certificate OK ($actual)")
+    }
+}
+
+// Verify the signing key before any release APK is packaged.
+tasks.matching { it.name == "packageRelease" }.configureEach {
+    dependsOn(verifyReleaseSigningCert)
 }
 
 dependencies {
