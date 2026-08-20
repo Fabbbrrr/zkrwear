@@ -9,6 +9,11 @@ vehicle's cloud service, so no Home Assistant, companion phone app, or VPN is re
   <img src="docs/screenshots/charging.png" width="30%" alt="Charging — live kW rate" />
   <img src="docs/screenshots/unlock.png"   width="30%" alt="Slide to unlock" />
 </p>
+<p align="center">
+  <img src="docs/screenshots/rearrange.png" width="30%" alt="Rearrange mode — long-press to drag-reorder and remove buttons" />
+  <img src="docs/screenshots/confirm.png"   width="30%" alt="Command in progress — the ring keeps turning until the car confirms" />
+</p>
+<p align="center"><sub>Long-press to rearrange buttons · the progress ring stays until the car confirms</sub></p>
 
 > Unofficial, community-built, and **not affiliated with the vehicle's manufacturer**. Built on
 > the excellent work of **[Fryyyy](https://github.com/Fryyyyy)** (see [Credits](#credits)).
@@ -32,6 +37,9 @@ vehicle's cloud service, so no Home Assistant, companion phone app, or VPN is re
 - 🛡️ **Sentry Mode** — arm/disarm the car's surveillance mode
 - 💡 **Flash lights** to find the car in a car park *(opt-in)*
 - 🔌 **Start / stop charging** *(opt-in)*
+- ⏳ **Confirm-until-landed** — after a command the **progress ring keeps turning** while the
+  app auto-refreshes with a growing backoff (1s, 5s, 10s…) for up to a minute, so the button
+  flips only once the **car actually reflects the change** (no premature "done")
 - 📳 **Haptic feedback** and an **in-place progress ring** while a command runs
 - ⚠️ Clear, cause-specific errors (*Car unreachable*, *Sign-in expired*, *Car declined*)
 
@@ -39,6 +47,11 @@ vehicle's cloud service, so no Home Assistant, companion phone app, or VPN is re
 
 - 🎛️ **Customizable buttons** — show/hide any action from the **Buttons** screen so small
   watches stay uncluttered
+- ✋ **Rearrange by long-press** — hold any action button to enter edit mode: the buttons
+  **wobble**, then **drag to reorder** them and tap **–** to remove one (iOS-style). Your
+  layout is saved and restored on next launch
+- 🎯 **Centered action grid** — with four or more buttons the grid grows outward from the
+  middle with a small gap, using the round screen better than edge-to-edge spacing
 - 🧩 **Tile** (glanceable battery, **with Lock/Unlock**) and **watch-face complication** (SOC)
 - 🔄 **Long-press the battery** to force a refresh
 - 👆 **Rotating bezel / crown** scrolling and **swipe-to-dismiss** settings
@@ -63,7 +76,8 @@ vehicle's cloud service, so no Home Assistant, companion phone app, or VPN is re
 - **Unofficial API.** The manufacturer may change the backend at any time and break this app.
 - **Region:** built and tested for **Australia (SEA region)**. Other regions may need endpoint
   or `COUNTRY_CODE` changes.
-- Commands are sent asynchronously; the on-screen state updates after a short refresh.
+- Commands are sent asynchronously; the button keeps its progress ring and auto-refreshes
+  until the car's cloud reflects the change (a growing backoff, up to ~1 minute).
 
 ## Install (for users, no coding)
 

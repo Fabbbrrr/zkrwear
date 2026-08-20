@@ -6,8 +6,22 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateOffsetAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.runtime.key
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
+import kotlin.math.ceil
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
@@ -82,10 +96,12 @@ import kotlinx.coroutines.launch
 fun VehicleScreen(
     state: VehicleUiState,
     commands: Map<CommandKind, CommandState>,
-    enabledSlots: Set<ActionSlot>,
+    enabledSlots: List<ActionSlot>,
     onAction: (CommandKind) -> Unit,
     onRetry: () -> Unit,
     onOpenSettings: () -> Unit,
+    onMoveSlot: (Int, Int) -> Unit = { _, _ -> },
+    onRemoveSlot: (ActionSlot) -> Unit = {},
 ) {
     // Anchor from the first item (default is 1, which jams the SOC hero under the
     // TimeText clock); combined with autoCentering=null this top-aligns the content.
@@ -120,7 +136,10 @@ fun VehicleScreen(
                 )
             }
             is VehicleUiState.Ready ->
-                ReadyContent(state, commands, enabledSlots, onAction, onOpenSettings, onRetry, listState)
+                ReadyContent(
+                    state, commands, enabledSlots, onAction, onOpenSettings, onRetry,
+                    onMoveSlot, onRemoveSlot, listState,
+                )
         }
     }
 }
@@ -129,10 +148,12 @@ fun VehicleScreen(
 private fun ReadyContent(
     state: VehicleUiState.Ready,
     commands: Map<CommandKind, CommandState>,
-    enabledSlots: Set<ActionSlot>,
+    enabledSlots: List<ActionSlot>,
     onAction: (CommandKind) -> Unit,
     onOpenSettings: () -> Unit,
     onRefresh: () -> Unit,
+    onMoveSlot: (Int, Int) -> Unit,
+    onRemoveSlot: (ActionSlot) -> Unit,
     listState: ScalingLazyListState,
 ) {
     val s = state.status
@@ -140,6 +161,12 @@ private fun ReadyContent(
     val focusRequester = remember { FocusRequester() }
     // Give the list focus so the rotating bezel / crown scrolls it.
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    // Long-press any action button to rearrange them (wobble + drag + remove).
+    var editMode by remember { mutableStateOf(false) }
+    // Auto-leave edit mode once nothing is left to arrange.
+    LaunchedEffect(enabledSlots.isEmpty()) { if (enabledSlots.isEmpty()) editMode = false }
+    BackHandler(enabled = editMode) { editMode = false }
 
     ScalingLazyColumn(
         state = listState,
@@ -174,14 +201,19 @@ private fun ReadyContent(
                 status = s,
                 commands = commands,
                 enabledSlots = enabledSlots,
+                editMode = editMode,
                 onAction = onAction,
+                onEnterEdit = { editMode = true },
+                onMove = onMoveSlot,
+                onRemove = onRemoveSlot,
             )
         }
         item {
+            // In edit mode this chip becomes "Done"; otherwise it opens settings.
             CompactChip(
-                onClick = onOpenSettings,
-                label = { Text("Buttons") },
-                colors = ChipDefaults.secondaryChipColors(),
+                onClick = { if (editMode) editMode = false else onOpenSettings() },
+                label = { Text(if (editMode) "Done" else "Buttons") },
+                colors = if (editMode) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
                 modifier = Modifier.padding(top = 6.dp),
             )
         }
@@ -358,15 +390,19 @@ private fun BatteryBar(soc: Int?, charging: Boolean = false) {
  * The user's enabled icon actions, in [ActionSlot] order. Unlock and Trunk require
  * a slide-to-confirm (which replaces the cluster while active); Lock, Climate and
  * Sentry fire immediately (Sentry shows On/Off and toggles). Up to three slots
- * sit on one row; four wrap to a balanced 2 + 2 so nothing overflows a small
- * round screen.
+ * sit on one row; four or more wrap to centred rows of two so nothing overflows
+ * a small round screen.
  */
 @Composable
 private fun ActionCluster(
     status: com.zkrwatch.data.model.VehicleStatus,
     commands: Map<CommandKind, CommandState>,
-    enabledSlots: Set<ActionSlot>,
+    enabledSlots: List<ActionSlot>,
+    editMode: Boolean,
     onAction: (CommandKind) -> Unit,
+    onEnterEdit: () -> Unit,
+    onMove: (Int, Int) -> Unit,
+    onRemove: (ActionSlot) -> Unit,
 ) {
     val locked = status.locked
 
@@ -384,7 +420,16 @@ private fun ActionCluster(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
     ) {
-        if (confirm != null) {
+        if (editMode && enabledSlots.isNotEmpty()) {
+            // Rearrange mode: wobbling, draggable buttons with a remove badge. Taps
+            // do nothing here (the buttons are inert) so no action fires while editing.
+            EditableActionGrid(
+                slots = enabledSlots,
+                status = status,
+                onMove = onMove,
+                onRemove = onRemove,
+            )
+        } else if (confirm != null) {
             val label = if (confirm == CommandKind.TRUNK) "Slide to open trunk" else "Slide to unlock"
             SlideToConfirm(text = label) {
                 val kind = confirm!!
@@ -401,47 +446,187 @@ private fun ActionCluster(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             )
         } else {
-            val slots = ActionSlot.entries.filter { it in enabledSlots }
-            if (slots.isNotEmpty()) {
-                // ≤3 slots stay on one row (unchanged layout); 4 wrap to 2 + 2.
-                val twoByTwo = slots.size == 4
-                val perRow = if (slots.size <= 3) slots.size else 2
-                slots.chunked(perRow).forEachIndexed { index, rowSlots ->
-                    if (index > 0) Spacer(Modifier.height(10.dp))
-                    Row(
-                        // The 2×2 grid clusters toward the centre (rather than spreading
-                        // edge-to-edge) so the round screen's curve never clips the
-                        // corner buttons; single rows of ≤3 keep the wide spread.
-                        modifier = Modifier.fillMaxWidth()
-                            .padding(horizontal = if (twoByTwo) 0.dp else 18.dp),
-                        horizontalArrangement = when {
-                            rowSlots.size == 1 -> Arrangement.Center
-                            twoByTwo -> Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally)
-                            else -> Arrangement.SpaceBetween
-                        },
-                    ) {
-                        rowSlots.forEach { slot ->
-                            SlotButton(
-                                slot = slot,
-                                status = status,
-                                commands = commands,
-                                onAction = onAction,
-                                onConfirm = { confirm = it },
-                            )
-                        }
+            val slots = enabledSlots
+            // ≤3 slots stay on one row (wide spread); 4+ wrap to rows of two.
+            val wrap = slots.size > 3
+            val perRow = if (wrap) 2 else slots.size
+            slots.chunked(perRow).forEachIndexed { index, rowSlots ->
+                if (index > 0) Spacer(Modifier.height(10.dp))
+                Row(
+                    // Wrapped rows (4+ slots) are centred with a small gap so the
+                    // buttons grow outward from the middle instead of hugging the rim
+                    // of the round screen; a lone trailing button centres too. Single
+                    // rows of ≤3 keep the wide edge-to-edge spread.
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = if (wrap) 0.dp else 18.dp),
+                    horizontalArrangement = when {
+                        rowSlots.size == 1 -> Arrangement.Center
+                        wrap -> Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
+                        else -> Arrangement.SpaceBetween
+                    },
+                ) {
+                    rowSlots.forEach { slot ->
+                        SlotButton(
+                            slot = slot,
+                            status = status,
+                            commands = commands,
+                            onAction = onAction,
+                            onConfirm = { confirm = it },
+                            onLongPress = onEnterEdit,
+                        )
                     }
                 }
             }
         }
 
-        statusLine(commands, status)?.let {
+        if (editMode) {
             Spacer(Modifier.height(4.dp))
-            Text(it, style = MaterialTheme.typography.caption2, color = ZkrGrey, maxLines = 1)
+            Text(
+                "Drag to reorder · – to remove",
+                style = MaterialTheme.typography.caption2,
+                color = ZkrGrey,
+                maxLines = 1,
+            )
+        } else {
+            statusLine(commands, status)?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(it, style = MaterialTheme.typography.caption2, color = ZkrGrey, maxLines = 1)
+            }
         }
     }
 }
 
-/** Renders one [ActionSlot] as its icon button, wiring immediate vs slide-to-confirm behavior. */
+/**
+ * Edit-mode grid: the enabled [slots] laid out in the same wrap pattern as normal,
+ * but each button wobbles, carries a remove (–) badge, and can be dragged to a new
+ * cell to reorder. A single pointer handler on the grid owns the drag so coordinates
+ * stay in one space; the buttons themselves are inert, so a tap never fires an action.
+ */
+@Composable
+private fun EditableActionGrid(
+    slots: List<ActionSlot>,
+    status: com.zkrwatch.data.model.VehicleStatus,
+    onMove: (Int, Int) -> Unit,
+    onRemove: (ActionSlot) -> Unit,
+) {
+    val cols = if (slots.size <= 3) slots.size.coerceAtLeast(1) else 2
+    val rows = ceil(slots.size / cols.toFloat()).toInt().coerceAtLeast(1)
+    val button = 56.dp
+    val gap = 16.dp
+    val density = LocalDensity.current
+    val stepPx = with(density) { (button + gap).toPx() }
+    val halfPx = with(density) { (button / 2).toPx() }
+    val gridW = button * cols + gap * (cols - 1)
+    val gridH = button * rows + gap * (rows - 1)
+
+    fun baseOffset(i: Int) = Offset((i % cols) * stepPx, (i / cols) * stepPx)
+    fun indexAt(p: Offset): Int? {
+        val c = (p.x / stepPx).toInt()
+        val r = (p.y / stepPx).toInt()
+        if (c < 0 || c >= cols || r < 0 || r >= rows) return null
+        return (r * cols + c).takeIf { it in slots.indices }
+    }
+
+    var dragSlot by remember { mutableStateOf<ActionSlot?>(null) }
+    var dragPos by remember { mutableStateOf(Offset.Zero) }
+    // The gesture handler isn't restarted on reorder (only on count change), so read
+    // the live order through this rather than the captured `slots`.
+    val liveSlots = rememberUpdatedState(slots)
+
+    Box(
+        modifier = Modifier
+            .size(gridW, gridH)
+            .pointerInput(slots.size) {
+                detectDragGestures(
+                    onDragStart = { pos ->
+                        indexAt(pos)?.let { idx ->
+                            dragSlot = liveSlots.value[idx]
+                            dragPos = pos
+                        }
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        dragPos = change.position
+                        val from = dragSlot?.let { liveSlots.value.indexOf(it) }
+                        val to = indexAt(dragPos)
+                        if (from != null && from >= 0 && to != null && to != from) onMove(from, to)
+                    },
+                    onDragEnd = { dragSlot = null },
+                    onDragCancel = { dragSlot = null },
+                )
+            },
+    ) {
+        slots.forEachIndexed { index, slot ->
+            key(slot) {
+                val dragging = slot == dragSlot
+                val target = if (dragging) dragPos - Offset(halfPx, halfPx) else baseOffset(index)
+                // Non-dragged buttons slide to their new cell; the dragged one tracks the finger.
+                val animated by animateOffsetAsState(target, label = "slotOffset")
+                val pos = if (dragging) target else animated
+                val wobble = rememberWobble(index)
+                Box(
+                    modifier = Modifier
+                        .offset { IntOffset(pos.x.roundToInt(), pos.y.roundToInt()) }
+                        .zIndex(if (dragging) 1f else 0f)
+                        .graphicsLayer { rotationZ = if (dragging) 0f else wobble },
+                ) {
+                    SlotButton(
+                        slot = slot,
+                        status = status,
+                        commands = emptyMap(),
+                        interactive = false,
+                        onAction = {},
+                        onConfirm = {},
+                    )
+                    RemoveBadge(onClick = { onRemove(slot) })
+                }
+            }
+        }
+    }
+}
+
+/** A gentle continuous tilt for edit mode; the per-item [seed] desyncs the phase. */
+@Composable
+private fun rememberWobble(seed: Int): Float {
+    val transition = rememberInfiniteTransition(label = "wobble")
+    val angle by transition.animateFloat(
+        initialValue = -3.5f,
+        targetValue = 3.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(160 + (seed % 3) * 30, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "wobbleAngle",
+    )
+    return angle
+}
+
+/** White circle with a minus sign, top-left of a button in edit mode; tap to remove. */
+@Composable
+private fun BoxScope.RemoveBadge(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .align(Alignment.TopStart)
+            .size(20.dp)
+            .clip(CircleShape)
+            .background(androidx.compose.ui.graphics.Color.White)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(width = 10.dp, height = 2.5.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(androidx.compose.ui.graphics.Color.Black),
+        )
+    }
+}
+
+/**
+ * Renders one [ActionSlot] as its icon button, wiring immediate vs slide-to-confirm
+ * behaviour. A long press starts edit mode via [onLongPress]. When [interactive] is
+ * false (edit mode) the button is inert — taps and drags never fire the action.
+ */
 @Composable
 private fun SlotButton(
     slot: ActionSlot,
@@ -449,8 +634,13 @@ private fun SlotButton(
     commands: Map<CommandKind, CommandState>,
     onAction: (CommandKind) -> Unit,
     onConfirm: (CommandKind) -> Unit,
+    interactive: Boolean = true,
+    onLongPress: (() -> Unit)? = null,
 ) {
     fun pending(vararg kinds: CommandKind) = kinds.any { commands[it] is CommandState.Pending }
+    val onLong = if (interactive) onLongPress else null
+    // Null onClick => inert (edit mode): no action on tap, and drag reaches the grid.
+    fun click(block: () -> Unit): (() -> Unit)? = if (interactive) block else null
     when (slot) {
         // The icon shows current lock STATUS: an orange open padlock warns the car is
         // unlocked (tap to lock); a white closed padlock means locked (tap to unlock,
@@ -458,19 +648,26 @@ private fun SlotButton(
         ActionSlot.LOCK ->
             if (status.locked == false) {
                 IconAction(
-                    R.drawable.ic_lock_open, "Lock", ZkrOrange,
+                    R.drawable.ic_lock_open, "Lock", tint = ZkrOrange,
                     pending = pending(CommandKind.LOCK, CommandKind.UNLOCK),
-                ) { onAction(CommandKind.LOCK) }
+                    onClick = click { onAction(CommandKind.LOCK) },
+                    onLongClick = onLong,
+                )
             } else {
                 IconAction(
                     R.drawable.ic_lock, "Unlock",
                     pending = pending(CommandKind.LOCK, CommandKind.UNLOCK),
-                ) { onConfirm(CommandKind.UNLOCK) }
+                    onClick = click { onConfirm(CommandKind.UNLOCK) },
+                    onLongClick = onLong,
+                )
             }
         ActionSlot.TRUNK ->
-            IconAction(R.drawable.ic_trunk, "Trunk", pending = pending(CommandKind.TRUNK)) {
-                onConfirm(CommandKind.TRUNK)
-            }
+            IconAction(
+                R.drawable.ic_trunk, "Trunk",
+                pending = pending(CommandKind.TRUNK),
+                onClick = click { onConfirm(CommandKind.TRUNK) },
+                onLongClick = onLong,
+            )
         // Active state is signaled by the orange (primary) button fill; the icon stays
         // white so it's always legible (an orange tint on the orange fill would vanish).
         // Shows the cabin temperature under the icon when known, for climate context.
@@ -479,24 +676,32 @@ private fun SlotButton(
                 on = status.climateActive == true,
                 interiorTempC = status.interiorTempC,
                 pending = pending(CommandKind.CLIMATE),
-            ) { onAction(CommandKind.CLIMATE) }
+                onClick = click { onAction(CommandKind.CLIMATE) },
+                onLongClick = onLong,
+            )
         ActionSlot.SENTRY ->
             SentryButton(
                 on = status.sentryActive,
                 pending = pending(CommandKind.SENTRY),
-            ) { onAction(CommandKind.SENTRY) }
+                onClick = click { onAction(CommandKind.SENTRY) },
+                onLongClick = onLong,
+            )
         // Momentary locate: flashes the blinkers. Fires immediately (harmless).
         ActionSlot.FLASH ->
-            IconAction(R.drawable.ic_flash, "Flash") { onAction(CommandKind.FLASH) }
+            IconAction(
+                R.drawable.ic_flash, "Flash",
+                onClick = click { onAction(CommandKind.FLASH) },
+                onLongClick = onLong,
+            )
         // Toggles charging; orange while the car is actively charging.
-        ActionSlot.CHARGING -> {
-            val on = status.charging == true
+        ActionSlot.CHARGING ->
             IconAction(
                 iconRes = R.drawable.ic_charge,
                 label = "Charge",
-                colors = if (on) ButtonDefaults.primaryButtonColors() else ButtonDefaults.secondaryButtonColors(),
-            ) { onAction(CommandKind.CHARGING) }
-        }
+                filled = status.charging == true,
+                onClick = click { onAction(CommandKind.CHARGING) },
+                onLongClick = onLong,
+            )
     }
 }
 
@@ -510,14 +715,11 @@ private fun ClimateButton(
     on: Boolean,
     interiorTempC: Double?,
     pending: Boolean = false,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
+    onLongClick: (() -> Unit)? = null,
 ) {
     Box(contentAlignment = Alignment.Center) {
-        Button(
-            onClick = { if (!pending) onClick() },
-            colors = if (on) ButtonDefaults.primaryButtonColors() else ButtonDefaults.secondaryButtonColors(),
-            modifier = Modifier.size(56.dp),
-        ) {
+        ActionButton(filled = on, onClick = if (pending) null else onClick, onLongClick = onLongClick) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
@@ -558,7 +760,8 @@ private fun ClimateButton(
 private fun SentryButton(
     on: Boolean?,
     pending: Boolean = false,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val armed = on == true
     val stateLabel = when (on) {
@@ -567,11 +770,7 @@ private fun SentryButton(
         null -> "—"
     }
     Box(contentAlignment = Alignment.Center) {
-        Button(
-            onClick = { if (!pending) onClick() },
-            colors = if (armed) ButtonDefaults.primaryButtonColors() else ButtonDefaults.secondaryButtonColors(),
-            modifier = Modifier.size(56.dp),
-        ) {
+        ActionButton(filled = armed, onClick = if (pending) null else onClick, onLongClick = onLongClick) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
@@ -611,16 +810,13 @@ private fun IconAction(
     iconRes: Int,
     label: String,
     tint: androidx.compose.ui.graphics.Color = MaterialTheme.colors.onSurface,
-    colors: ButtonColors = ButtonDefaults.secondaryButtonColors(),
+    filled: Boolean = false,
     pending: Boolean = false,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
+    onLongClick: (() -> Unit)? = null,
 ) {
     Box(contentAlignment = Alignment.Center) {
-        Button(
-            onClick = { if (!pending) onClick() },
-            colors = colors,
-            modifier = Modifier.size(56.dp),
-        ) {
+        ActionButton(filled = filled, onClick = if (pending) null else onClick, onLongClick = onLongClick) {
             Icon(
                 painter = painterResource(iconRes),
                 contentDescription = label,
@@ -637,6 +833,30 @@ private fun IconAction(
             )
         }
     }
+}
+
+/**
+ * Circular action surface matching the Wear button look: orange [filled] fill when
+ * active, else the dark secondary surface. A null [onClick] renders it inert (edit
+ * mode) so a tap fires nothing and a drag passes through to the reorder grid;
+ * [onLongClick] enters edit mode.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ActionButton(
+    filled: Boolean,
+    onClick: (() -> Unit)?,
+    onLongClick: (() -> Unit)? = null,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val bg = if (filled) MaterialTheme.colors.primary else MaterialTheme.colors.surface
+    val base = Modifier.size(56.dp).clip(CircleShape).background(bg)
+    val clickable = if (onClick != null) {
+        base.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+    } else {
+        base
+    }
+    Box(modifier = clickable, contentAlignment = Alignment.Center, content = content)
 }
 
 /** Most-recent command status as a short line, or null when all idle. */

@@ -3,7 +3,10 @@
 agp = "8.13.2"
 kotlin = "2.0.0"
 composeBom = "2024.09.03"
-wearCompose = "1.3.1"
+# 1.4.1 fixes the reduce_motion SecurityException that crashed status render on
+# Wear OS 5.1 (API 35+). Depends on Compose 1.7.0, so it stays within the pinned
+# composeBom 2024.09.03 (Compose 1.7.x) — no BOM/Kotlin ripple.
+wearCompose = "1.4.1"
 activity = "1.9.2"
 lifecycle = "2.8.6"
 coroutines = "1.8.1"
