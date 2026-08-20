@@ -6,6 +6,8 @@
     <!-- Direct-to-cloud: needs internet (phone data proxy, watch WiFi, or LTE). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- In-app update: download the latest release APK and hand it to the system installer. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:allowBackup="false"
@@ -54,6 +56,11 @@
                 android:name="androidx.wear.tiles.PREVIEW"
                 android:resource="@drawable/ic_launcher_foreground" />
         </service>
+
+        <!-- Relays the package installer's confirm step (in-app update). -->
+        <receiver
+            android:name=".data.update.UpdateInstallReceiver"
+            android:exported="false" />
 
         <!-- SOC watch-face complication -->
         <service

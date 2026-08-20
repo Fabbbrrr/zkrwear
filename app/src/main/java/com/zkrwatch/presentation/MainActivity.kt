@@ -64,6 +64,8 @@ fun WearApp() {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val commands by vm.commandStates.collectAsStateWithLifecycle()
     val enabledSlots by vm.enabledSlots.collectAsStateWithLifecycle()
+    val update by vm.update.collectAsStateWithLifecycle()
+    val updating by vm.updating.collectAsStateWithLifecycle()
     var showSettings by remember { mutableStateOf(false) }
 
     // Confirmation haptics: a light tick when a command is sent, and a distinct
@@ -144,6 +146,9 @@ fun WearApp() {
                     onOpenSettings = { showSettings = true },
                     onMoveSlot = vm::moveSlot,
                     onRemoveSlot = vm::removeSlot,
+                    update = update,
+                    updating = updating,
+                    onInstallUpdate = { vm.installUpdate(appContext) },
                 )
             }
         }
