@@ -165,13 +165,13 @@ class ZkrHttp(
         client.newCall(request).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
             if (text.isEmpty()) {
-                return mapOf("success" to false, "error" to "Empty response", "status_code" to resp.code)
+                throw ZkrException("Empty response from server")
             }
             return try {
                 anyAdapter.fromJson(text) as? Map<String, Any?>
-                    ?: mapOf("success" to false, "error" to "Non-object JSON response")
+                    ?: throw ZkrException("Non-object JSON response")
             } catch (e: Exception) {
-                mapOf("success" to false, "error" to "Invalid JSON: ${e.message}", "status_code" to resp.code)
+                throw ZkrException("Invalid JSON response: ${e.message}")
             }
         }
     }
