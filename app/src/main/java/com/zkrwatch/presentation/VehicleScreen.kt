@@ -84,6 +84,7 @@ import androidx.wear.compose.material.TimeText
 import androidx.wear.compose.material.Vignette
 import androidx.wear.compose.material.VignettePosition
 import com.zkrwatch.R
+import com.zkrwatch.data.update.UpdateInfo
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
@@ -102,6 +103,9 @@ fun VehicleScreen(
     onOpenSettings: () -> Unit,
     onMoveSlot: (Int, Int) -> Unit = { _, _ -> },
     onRemoveSlot: (ActionSlot) -> Unit = {},
+    update: UpdateInfo? = null,
+    updating: Boolean = false,
+    onInstallUpdate: () -> Unit = {},
 ) {
     // Anchor from the first item (default is 1, which jams the SOC hero under the
     // TimeText clock); combined with autoCentering=null this top-aligns the content.
@@ -138,7 +142,7 @@ fun VehicleScreen(
             is VehicleUiState.Ready ->
                 ReadyContent(
                     state, commands, enabledSlots, onAction, onOpenSettings, onRetry,
-                    onMoveSlot, onRemoveSlot, listState,
+                    onMoveSlot, onRemoveSlot, update, updating, onInstallUpdate, listState,
                 )
         }
     }
@@ -154,6 +158,9 @@ private fun ReadyContent(
     onRefresh: () -> Unit,
     onMoveSlot: (Int, Int) -> Unit,
     onRemoveSlot: (ActionSlot) -> Unit,
+    update: UpdateInfo?,
+    updating: Boolean,
+    onInstallUpdate: () -> Unit,
     listState: ScalingLazyListState,
 ) {
     val s = state.status
@@ -216,6 +223,18 @@ private fun ReadyContent(
                 colors = if (editMode) ChipDefaults.primaryChipColors() else ChipDefaults.secondaryChipColors(),
                 modifier = Modifier.padding(top = 6.dp),
             )
+        }
+        // Only shown when a newer GitHub release exists — a single tap downloads and
+        // installs it. No banner or prompt, so it's never in the way when up to date.
+        if (update != null && !editMode) {
+            item {
+                Chip(
+                    onClick = { if (!updating) onInstallUpdate() },
+                    label = { Text(if (updating) "Downloading…" else "Update to ${update.versionName}") },
+                    colors = ChipDefaults.primaryChipColors(),
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                )
+            }
         }
     }
 }

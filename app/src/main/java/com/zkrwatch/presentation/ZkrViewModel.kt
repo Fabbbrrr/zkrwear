@@ -11,6 +11,9 @@ import com.zkrwatch.data.net.ZkrKeys
 import com.zkrwatch.data.repo.ZkrRepository
 import com.zkrwatch.data.store.ConfigStore
 import com.zkrwatch.data.store.UiPrefsStore
+import com.zkrwatch.data.update.ApkUpdater
+import com.zkrwatch.data.update.UpdateChecker
+import com.zkrwatch.data.update.UpdateInfo
 import java.io.IOException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -73,6 +76,34 @@ class ZkrViewModel(
         CommandKind.entries.associateWith { CommandState.Idle } as Map<CommandKind, CommandState>,
     )
     val commandStates: StateFlow<Map<CommandKind, CommandState>> = _commandStates.asStateFlow()
+
+    // In-app update: null until a newer GitHub release is found. Checked once at start,
+    // fully isolated from the vehicle API (see UpdateChecker); nothing private is sent.
+    private val updateChecker = UpdateChecker(BuildConfig.VERSION_NAME)
+    private val _update = MutableStateFlow<UpdateInfo?>(null)
+    val update: StateFlow<UpdateInfo?> = _update.asStateFlow()
+    private val _updating = MutableStateFlow(false)
+    val updating: StateFlow<Boolean> = _updating.asStateFlow()
+
+    init {
+        // Only when the app is set up (the update button lives on the Ready screen).
+        if (repo != null) {
+            viewModelScope.launch {
+                _update.value = runCatching { updateChecker.check() }.getOrNull()
+            }
+        }
+    }
+
+    /** Download the latest release APK and launch the system installer. */
+    fun installUpdate(context: android.content.Context) {
+        val info = _update.value ?: return
+        if (_updating.value) return
+        _updating.value = true
+        viewModelScope.launch {
+            ApkUpdater.downloadAndInstall(context, info)
+            _updating.value = false
+        }
+    }
 
     private var vin: String? = null
     private var refreshJob: Job? = null
